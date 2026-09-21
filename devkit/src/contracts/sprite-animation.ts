@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { imageOptionsSchema } from "./image-generation.js";
+import { spriteVideoCreateSchema, spriteVideoStatusSchema, spriteVideoReprocessSchema } from "./sprite-video.js";
 
 const asset = z.string().regex(/^assets\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.png$/);
 const run = z.string().regex(/^assets\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+$/);
@@ -24,6 +25,7 @@ const selection = z.object({
     fps: z.number().min(1).max(60).optional(), loop: z.boolean().optional(),
 }).strict();
 export const spriteAnimationSchema = z.discriminatedUnion("operation", [
+    spriteVideoCreateSchema, spriteVideoStatusSchema, spriteVideoReprocessSchema,
     z.object({ operation: z.literal("prepare"), run, request: spriteRequestSchema }).strict(),
     z.object({ operation: z.literal("generate"), run, state: name, options: imageOptionsSchema.optional() }).strict(),
     z.object({ operation: z.literal("compose"), run,
@@ -35,5 +37,6 @@ export const spriteAnimationSchema = z.discriminatedUnion("operation", [
 ]);
 export type SpriteRequest = z.infer<typeof spriteRequestSchema>;
 export type SpriteAnimationInput = z.infer<typeof spriteAnimationSchema>;
-export type SpriteAnimationResult = { operation: SpriteAnimationInput["operation"]; run: string; paths: string[]; warnings?: string[] };
+export type SpriteAnimationResult = { operation: SpriteAnimationInput["operation"]; run: string; paths: string[]; warnings?: string[];
+    jobId?: string; status?: "pending" | "completed" | "failed" | "uncertain"; message?: string };
 export type SpriteAnimationInvoker = (input: SpriteAnimationInput, signal?: AbortSignal) => Promise<SpriteAnimationResult>;

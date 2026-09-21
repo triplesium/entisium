@@ -5,12 +5,15 @@ import type { ImageGenerationInvoker } from "../contracts/image-generation.js";
 import { HostProjectService } from "../workspace/project-service.js";
 import { decodePng, extractRow, layoutGuide, rowDimensions } from "./processing.js";
 import { inspectFrames } from "./quality.js";
+import { SpriteVideoService } from "./video-service.js";
+import type { SpriteVideoProvider } from "./video-provider.js";
 
 /** Serialize a run within this process. Exclusive create also protects paid generation across hosts. */
 const active = new Set<string>();
 export class SpriteAnimationService {
     constructor(private readonly project: HostProjectService,
-        private readonly images: (project: HostProjectService) => ImageGenerationInvoker) {}
+        private readonly images: (project: HostProjectService) => ImageGenerationInvoker,
+        private readonly videos?: SpriteVideoProvider) {}
 
     async invoke(parameters: unknown, signal?: AbortSignal): Promise<SpriteAnimationResult> {
         const input = spriteAnimationSchema.parse(parameters);
@@ -21,6 +24,9 @@ export class SpriteAnimationService {
         active.add(key);
         const project = new HostProjectService(root);
         try {
+            if (input.operation === "create" || input.operation === "status" || input.operation === "reprocess") {
+                return await new SpriteVideoService(project, this.videos).invoke(input, signal);
+            }
             if (input.operation === "prepare") return await this.prepare(project, input, signal);
             const source = await project.read(`${input.run}/request.json`);
             if (!source) throw new Error("Prepare the sprite run first.");
