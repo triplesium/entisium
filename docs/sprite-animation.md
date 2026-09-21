@@ -1,12 +1,83 @@
 # Sprite animation assets
 
 The native Editor agent and standalone Agent CLI expose `sprite_animation`.
-The TypeScript implementation lives in DevKit and follows the staged approach
+The default V1 workflow is one-call image-to-video generation with local soft-edge
+matting and sprite export. The TypeScript implementation lives in DevKit.
+The legacy image-row workflow follows the staged approach
 of [sprite-gen](https://github.com/aldegad/sprite-gen): preserve the reference,
 generate one action row at a time, process locally, and export explicit frame
 rectangles. It does not require the upstream Python CLI or copy its code.
 
-## Workflow
+## V1: one-call video workflow
+
+Create/import a full-body character PNG on a flat `#00ff00` background, with clear
+margins and no green materials on the character. V1 targets smooth cartoon loops,
+not pixel-art. Configure the `fal` API credential (or `FAL_KEY`) and install
+`ffmpeg` and `ffprobe` on the host PATH. Missing tools fail before paid submission.
+
+Call `sprite_animation` once:
+
+```json
+{
+  "operation": "create",
+  "run": "assets/generated/hero-walk-v1",
+  "characterImage": "assets/hero.png",
+  "action": "Walk in place facing right, alternating foot contacts and opposite arm swings",
+  "name": "walk"
+}
+```
+
+The service submits one `minimax/h3-max-turbo/image-to-video` request (5 seconds,
+480P, balanced prompt expansion, safety enabled), then downloads and processes it.
+V1 supports this endpoint only. Optional `seed` defaults to 20260911, `cellSize`
+to 256, `frameCount` to 16 and `align` to true. Pricing is provider-controlled;
+there is no hard-coded price or automatic paid retry.
+
+`waitMs` controls queue polling (default 20000, max 30000); network and local
+processing have separate timeouts. If still queued, the result contains
+`status: "pending"` and `jobId` equal to `run`. Continue with:
+
+```json
+{"operation":"status","run":"assets/generated/hero-walk-v1"}
+```
+
+Status resumes the same provider request and completes local export. No background
+worker keeps running after a pending response; the Agent calls status to advance
+it. Job records survive host restarts. Repeating create with identical inputs
+resumes the job; conflicting inputs are rejected. An exclusive reservation is
+written before submission, preventing duplicate paid requests across hosts.
+`uncertain` means acknowledgement was not saved: inspect provider history rather
+than automatically creating a new run. `failed` reports provider rejection or a
+local processing error; local failures preserve the video for reprocessing.
+
+Local processing decodes source timestamps at native resolution, recovers soft
+alpha and edge color against green, aligns upper bodies horizontally, searches
+0.5–2.5-second repeating poses, samples the cycle, and performs one Lanczos resize.
+It exports immutable `exports/<id>/` revisions with `atlas.png`, `frames/*.png`,
+`animation.json`, `quality.json` and a pausable checkerboard HTML preview. Use the
+per-frame `durationMs`, not the average `fps`, for playback. Motion and anatomy
+still require visual review; no detected cycle is a failure, not a fabricated loop.
+
+The run stores `video-job.json`, `video-reference.png`, `video-attempt.json`,
+`video-queue.json`, `video.mp4`, `video-result.json` (expanded prompt) and
+`video-completed.json`. No credentials or base64 inputs are stored. Completed
+status returns the same export. To change output settings without generation:
+
+```json
+{"operation":"reprocess","run":"assets/generated/hero-walk-v1","name":"walk","cellSize":256,"frameCount":16}
+```
+
+To import an existing video without credentials or paid calls, additionally set
+`video` to a project-local `assets/...mp4`; `run` may be new. Reprocess always makes
+a fresh export. Imported videos must have 8–360 frames, duration up to 15 seconds,
+at most 2048 pixels per side, 64 megapixels across all frames, and valid increasing
+timestamps. Input MP4 size is limited to 100 MiB. The same green-screen conditions
+apply. Temporary decoded files are removed after processing.
+
+Both CLI and Editor Agent use this contract. The Editor HTTP endpoint remains
+authenticated `POST /api/v1/sprite-animation`; it returns the same status and paths.
+
+## Legacy image-row workflow
 
 First create a character PNG using `generate_image`, or import an existing PNG
 inside the project's `assets/`. Then prepare a new run:

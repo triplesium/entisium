@@ -16,6 +16,7 @@ import { createImageGenerationTools } from "../tools/image-generation.js";
 import { createHostImageGeneration } from "../host/image-generation.js";
 import { SpriteAnimationService } from "@entisium/devkit/sprite-animation/service";
 import { createSpriteAnimationTools } from "../tools/sprite-animation.js";
+import { createHostSpriteVideo } from "../host/sprite-video.js";
 
 async function main() {
     const { values } = parseArgs({ options: {
@@ -47,7 +48,7 @@ async function main() {
         const sprites = new SpriteAnimationService(project, pinned => {
             const service = createHostImageGeneration(pinned, credentials, hostConfig.config, metadata);
             return service.generate.bind(service);
-        });
+        }, createHostSpriteVideo(credentials));
         const model = values.provider && values.model
             ? await registry.getModel(values.provider, values.model, abort.signal) : (await registry.activeModel(abort.signal)).model;
         if (!model) throw new Error("The requested provider has no supported chat connection.");

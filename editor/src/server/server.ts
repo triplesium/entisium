@@ -6,6 +6,7 @@ import { NativeRuntime } from "@entisium/devkit/runtime/native-runtime";
 import { parseAgentSettings } from "@entisium/agent/settings/config";
 import { imageGenerationSchema, type ImageGenerationInvoker } from "@entisium/devkit/contracts/image-generation";
 import { SpriteAnimationService } from "@entisium/devkit/sprite-animation/service";
+import { createHostSpriteVideo } from "@entisium/agent/host/sprite-video";
 import { spriteAnimationSchema } from "@entisium/devkit/contracts/sprite-animation";
 import { randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -342,7 +343,7 @@ export function createEditorHost(options: HostOptions): {
                     const service = new SpriteAnimationService(projects, pinned => {
                         const generator = createHostImageGeneration(pinned, options.credentials, options.config);
                         return options.generateImage ?? generator.generate.bind(generator);
-                    });
+                    }, createHostSpriteVideo(options.credentials));
                     const result = await service.invoke(input, controller.signal);
                     if (!response.destroyed) json(response, 200, result);
                 } finally { response.removeListener("close", disconnected); }
