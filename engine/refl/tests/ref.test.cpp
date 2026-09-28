@@ -122,6 +122,16 @@ TEST_CASE("Ref converts arithmetic values through to_number", "[refl][ref]") {
     REQUIRE(make_ref(integer).to_number<float>() == 42.0f);
     REQUIRE(make_ref(real).to_number<int>() == 2);
     REQUIRE(make_ref(flag).to_number<int>() == 1);
+    char character = 'A';
+    char8_t byte = u8'A';
+    char16_t word = u'A';
+    char32_t codepoint = U'\U0001F600';
+    wchar_t wide = L'A';
+    REQUIRE(make_ref(character).to_number<int>() == 65);
+    REQUIRE(make_ref(byte).to_number<int>() == 65);
+    REQUIRE(make_ref(word).to_number<int>() == 65);
+    REQUIRE(make_ref(codepoint).to_number<int>() == 128512);
+    REQUIRE(make_ref(wide).to_number<int>() == 65);
 }
 
 TEST_CASE("Ref exposes typed values through direct accessors", "[refl][ref]") {

@@ -54,7 +54,9 @@ constexpr uint32_t crc32(std::string_view str) {
         0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
     };
     uint32_t crc = 0xffffffff;
-    for (auto c : str) crc = (crc >> 8) ^ crc_table[(crc ^ c) & 0xff];
+    for (auto c : str) {
+        crc = (crc >> 8) ^ crc_table[(crc ^ c) & 0xff];
+    }
     return crc ^ 0xffffffff;
 }
 
@@ -79,15 +81,20 @@ consteval auto get_type_name_str_view() {
 #elif defined(_MSC_VER)
     auto split = func_name.substr(0, func_name.size() - 7);
     split = split.substr(split.find("get_type_name_str_view<") + 23);
-    auto pos = split.find(" ");
-    if (pos != std::string_view::npos) {
-        return split.substr(pos + 1);
+    // MSVC prefixes user-defined types, but spaces also belong to built-in
+    // names such as unsigned int and long long. Never strip arbitrary words.
+    constexpr std::string_view prefixes[] {"class ", "struct ", "enum "};
+    for (const auto prefix : prefixes) {
+        if (split.starts_with(prefix)) {
+            return split.substr(prefix.size());
+        }
     }
     return split;
 #else
     static_assert(
         false,
-        "You are using an unsupported compiler. Please use GCC, Clang or MSVC."
+        "You are using an unsupported compiler. Please use GCC, "
+        "Clang or MSVC."
     );
 #endif
 }

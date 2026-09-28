@@ -45,6 +45,9 @@ struct ReturnAdapter<Val> {
     }
 };
 
+template<class T>
+struct ReturnAdapter<const T> : ReturnAdapter<T> {};
+
 template<>
 struct ReturnAdapter<Ref> {
     static InvokeResult adapt(Ref ref) { return ReturnValue::reference(ref); }

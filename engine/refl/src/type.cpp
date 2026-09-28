@@ -8,6 +8,8 @@ bool Type::is_number() const {
 
 bool Type::is_integral() const {
     return m_id == type_id<bool>() || m_id == type_id<char>() ||
+           m_id == type_id<char8_t>() || m_id == type_id<char16_t>() ||
+           m_id == type_id<char32_t>() || m_id == type_id<wchar_t>() ||
            m_id == type_id<int>() || m_id == type_id<signed char>() ||
            m_id == type_id<unsigned char>() || m_id == type_id<short int>() ||
            m_id == type_id<unsigned int>() || m_id == type_id<long int>() ||

@@ -99,6 +99,16 @@ class Ref {
     T to_number() const {
         if (m_type_id == ets::type_id<int>()) {
             return static_cast<T>(get_const<int>());
+        } else if (m_type_id == ets::type_id<char>()) {
+            return static_cast<T>(get_const<char>());
+        } else if (m_type_id == ets::type_id<char8_t>()) {
+            return static_cast<T>(get_const<char8_t>());
+        } else if (m_type_id == ets::type_id<char16_t>()) {
+            return static_cast<T>(get_const<char16_t>());
+        } else if (m_type_id == ets::type_id<char32_t>()) {
+            return static_cast<T>(get_const<char32_t>());
+        } else if (m_type_id == ets::type_id<wchar_t>()) {
+            return static_cast<T>(get_const<wchar_t>());
         } else if (m_type_id == ets::type_id<signed char>()) {
             return static_cast<T>(get_const<signed char>());
         } else if (m_type_id == ets::type_id<unsigned char>()) {

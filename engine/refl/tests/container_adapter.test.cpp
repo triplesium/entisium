@@ -1718,3 +1718,22 @@ TEST_CASE(
     REQUIRE(tuple.indexed() != nullptr);
     REQUIRE(tuple.indexed()->fixed_size());
 }
+
+TEST_CASE(
+    "Standard optional reuses reflected nullable container operations",
+    "[refl][container]"
+) {
+    auto& registry = ets::Registry::instance();
+    registry.register_type<std::optional<int>>();
+    auto adapter = registry.try_get_container_adapter<std::optional<int>>();
+    REQUIRE(adapter);
+    REQUIRE(adapter->kind() == ets::ContainerKind::Optional);
+    auto* indexed = adapter->indexed();
+    REQUIRE(indexed);
+    std::optional<int> value;
+    int number = 42;
+    REQUIRE(indexed->append(ets::Ref(value), ets::Ref(number)));
+    CHECK(*value == 42);
+    REQUIRE(indexed->clear(ets::Ref(value)));
+    CHECK_FALSE(value);
+}

@@ -860,3 +860,21 @@ TEST_CASE("Cls try_get reports missing members", "[refl][cls]") {
         constructor.error().message.find("LookupFixture") != std::string::npos
     );
 }
+
+TEST_CASE(
+    "Const erased returns retain the payload and return qualification",
+    "[refl][callable]"
+) {
+    const MethodImpl method(
+        "snapshot",
+        +[]() -> const Val {
+            return make_val<std::string>("snapshot");
+        }
+    );
+    CHECK(method.return_type().is_const());
+    auto result = method.invoke_variadic({});
+    REQUIRE(result);
+    REQUIRE(result->is_value());
+    CHECK(result->value().type_id() == type_id<std::string>());
+    CHECK(result->value().get<std::string>() == "snapshot");
+}

@@ -96,6 +96,10 @@ TEST_CASE("Registry records type metadata and capabilities", "[refl][type]") {
     Type& float_type = registry.register_type<float>();
     REQUIRE(int_type.is_number());
     REQUIRE(int_type.is_integral());
+    REQUIRE(Registry::instance().register_type<char8_t>().is_integral());
+    REQUIRE(Registry::instance().register_type<char16_t>().is_integral());
+    REQUIRE(Registry::instance().register_type<char32_t>().is_integral());
+    REQUIRE(Registry::instance().register_type<wchar_t>().is_integral());
     REQUIRE_FALSE(int_type.is_floating_point());
     REQUIRE(float_type.is_number());
     REQUIRE_FALSE(float_type.is_integral());
@@ -251,4 +255,15 @@ TEST_CASE(
     CHECK(*enabled == "true");
     CHECK(*name == "typed");
     CHECK(*phase == "test");
+}
+
+TEST_CASE(
+    "Reflected numeric type identities preserve signedness and width",
+    "[refl][type]"
+) {
+    CHECK(ets::type_id<int>() != ets::type_id<unsigned int>());
+    CHECK(ets::type_id<long>() != ets::type_id<unsigned long>());
+    CHECK(ets::type_id<long>() != ets::type_id<long long>());
+    CHECK(ets::type_id<char>() != ets::type_id<signed char>());
+    CHECK(ets::type_id<char>() != ets::type_id<unsigned char>());
 }

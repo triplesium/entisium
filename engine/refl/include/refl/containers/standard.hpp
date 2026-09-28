@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -146,6 +147,21 @@ struct GenericTypeInfo<std::unordered_set<Key, Hash, Eq, Alloc>> {
 
     static std::unique_ptr<ContainerAdapter> make_container_adapter() {
         return std::make_unique<SetContainerAdapter<Container, Key>>();
+    }
+};
+
+template<class T>
+struct GenericTypeInfo<std::optional<T>> {
+    static constexpr bool supported = std::movable<T>;
+    using Container = std::optional<T>;
+    using Dependencies = std::tuple<T>;
+    static TypeId generic_type_id() {
+        return TypeId(std::string_view {"std::optional"});
+    }
+    static std::string generic_name() { return "std::optional"; }
+    static std::vector<TypeId> argument_type_ids() { return {type_id<T>()}; }
+    static std::unique_ptr<ContainerAdapter> make_container_adapter() {
+        return std::make_unique<OptionalContainerAdapter<Container, T>>();
     }
 };
 
