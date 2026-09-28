@@ -1,3 +1,5 @@
+local host_dependencies = {"entisium-runtime-host-core", "entisium-project"}
+
 target("entisium-runtime-host-core")
     set_kind("static")
     add_headerfiles("include/**.hpp")
@@ -45,8 +47,16 @@ target("entisium-runtime-host")
     set_rundir("$(projectdir)")
     add_rules("entisium.reflect", "entisium.luau-definitions")
     add_files("src/main.cpp")
-    add_deps("entisium-runtime-host-core", "entisium-project")
+    add_deps(table.unpack(host_dependencies))
     add_packages("glfw", "glad")
+
+target("entisium-runtime-host-sdk")
+    set_kind("phony")
+    set_default(false)
+    add_rules("entisium.luau-sdk")
+    set_values("luau.sdk.host", "entisium-runtime-host")
+    add_deps(table.unpack(host_dependencies))
+    add_deps("entisium-luau-playtest", {links = false})
 
 target("entisium-runtime-host-tests")
     set_kind("binary")

@@ -58,7 +58,8 @@ struct Options {
 [[nodiscard]] std::optional<std::filesystem::path>
 default_definition_index(char* executable) {
     auto candidate = std::filesystem::absolute(executable).parent_path() /
-                     "luau-definitions" / "index.json";
+                     "luau-definitions" / "entisium-runtime-host" /
+                     "index.json";
     if (std::filesystem::is_regular_file(candidate)) {
         return candidate;
     }

@@ -1,5 +1,4 @@
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { parse } from "yaml";
 import { z } from "zod/v4";
@@ -39,7 +38,6 @@ export async function runPlaytest(options: PlaytestOptions): Promise<{ operation
                 ?? resolve(dirname(runtimePath), process.platform === "win32" ? "entisium-luau-host.exe" : "entisium-luau-host"),
             sourceRoot: resolve(dirname(project), config.asset_directory),
             entry: resolve(options.entry),
-            sdkDirectory: fileURLToPath(new URL("../../../scripting/libraries/playtest/", import.meta.url)),
             signal: options.signal, timeoutMs: options.timeoutMs, onLog: options.onLog,
             allowDuringCancellation: method => method === "game.input",
             configuration: tape ? {...configuration, tape: tape.configuration()} : configuration,

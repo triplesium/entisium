@@ -349,7 +349,6 @@ EmissionSummary emit_definitions(
     const Database& database,
     const std::filesystem::path& manual_definitions,
     const std::filesystem::path& output_directory,
-    const std::filesystem::path& runtime_directory,
     const std::filesystem::path& libraries_directory
 ) {
     TypeMapper mapper {database};
@@ -425,28 +424,12 @@ EmissionSummary emit_definitions(
         write_if_changed(modules_directory / (module + ".luau"), source.str());
     }
 
-    const auto playtest_directory = output_directory / "playtest";
-    std::filesystem::create_directories(playtest_directory);
-    write_if_changed(
-        playtest_directory / "game.luau",
-        read_file(runtime_directory / "libraries/playtest/game.luau")
-    );
-    write_if_changed(
-        playtest_directory / "scheduler.luau",
-        read_file(runtime_directory / "libraries/playtest/scheduler.luau")
-    );
-    std::filesystem::remove(playtest_directory / "test.luau");
     const auto library_manifest = Json::parse(read_file(libraries_directory));
     if (library_manifest.at("format") != "entisium.luau-libraries" ||
         library_manifest.at("version") != 1) {
         throw std::runtime_error("Unsupported Luau library manifest");
     }
-    Json aliases {
-        {"entisium", "./modules"},
-        {"playtest", "./playtest"},
-        {"context", "./context"},
-        {"internal", "./internal"}
-    };
+    Json aliases {{"entisium", "./modules"}, {"internal", "./internal"}};
     Json outputs = Json::array();
     const auto publish = [&](const std::string& name,
                              const std::string& content) {
@@ -506,10 +489,6 @@ EmissionSummary emit_definitions(
         }
     }
     write_if_changed(output_directory / "globals.d.luau", globals.str());
-    publish(
-        "@context/init",
-        read_file(runtime_directory / "libraries/playtest/context.luau")
-    );
     const auto owned = output_directory / "library-files.json";
     if (std::filesystem::exists(owned)) {
         for (const auto& previous : Json::parse(read_file(owned))) {
@@ -539,6 +518,18 @@ EmissionSummary emit_definitions(
         {"baseLuaurc", ".luaurc"},
     };
     write_if_changed(output_directory / "index.json", index.dump(2) + '\n');
+
+    for (const auto& module : module_names) {
+        outputs.push_back("modules/" + module + ".luau");
+    }
+    for (const auto* file :
+         {"globals.d.luau", ".luaurc", "index.json", "library-files.json"}) {
+        outputs.push_back(file);
+    }
+    write_if_changed(
+        output_directory / "sdk-files.json",
+        outputs.dump(2) + '\n'
+    );
 
     return EmissionSummary {
         .class_count = database.classes.size(),

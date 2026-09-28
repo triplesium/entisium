@@ -16,7 +16,8 @@ export interface LuauHostOptions {
     onTape?(value: unknown): void;
     sourceRoot: string;
     entry: string;
-    sdkDirectory: string;
+    /** @deprecated Libraries are embedded in the native host. */
+    sdkDirectory?: string;
     dispatch(method: string, payload: unknown): Promise<unknown>;
     dispatchTask?: TaskDispatch;
     signal?: AbortSignal;
@@ -30,7 +31,7 @@ export async function runLuau(options: LuauHostOptions): Promise<void> {
     options.signal?.throwIfAborted();
     const startup = encodeHostConfiguration(options.configuration ?? emptyHostConfiguration());
     const tasks = new HostTasks(options.dispatchTask);
-    const child = spawn(options.executable, [options.sourceRoot, options.entry, options.sdkDirectory, "--config-stdin"], {
+    const child = spawn(options.executable, [options.sourceRoot, options.entry, "--config-stdin"], {
         windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
     });
     let failure: Error | undefined;

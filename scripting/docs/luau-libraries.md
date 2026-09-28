@@ -4,6 +4,11 @@ Each library is an independent xmake target. File lists and target dependencies
 are the build contract; C++ annotations describe native exports. No handwritten
 JSON, header/source path settings, or per-file export rules are needed.
 
+Libraries live in [`scripting/libraries`](../libraries/), with Luau sources,
+native adapters and tests together. The VM, compiler and common binding
+interfaces remain in [`engine/scripting`](../../engine/scripting/).
+See the [Scripting index](../README.md) for public modules and examples.
+
 ## Native library
 
 ```lua
@@ -136,19 +141,53 @@ does not depend on any Luau library. entisium-scripting is a compatibility bundl
 of the usual JSON, Task, Schema, HTTP, AI and Context libraries.
 
 A host can depend on that bundle or select individual library targets. The
-project-wide catalog rule activates only for binary/shared targets that depend
-on scripting-core. It generates an explicit default_luau_libraries function
+project-wide catalog rule activates for binary/shared hosts and SDK targets that
+depend on scripting-core. For executable hosts, it generates an explicit default_luau_libraries function
 referencing each reachable library's unique registration function. Static
 linkers therefore retain selected libraries without global constructor
 registration. Duplicate module names and missing/cyclic dependencies are errors.
 
 Each library generates its own C++ and manifest under its target's autogendir.
-The host merges the manifests from its actual dependency graph. SDK publication
-uses that same host catalog, including private source files for relative type
+The host merges the manifests reachable through direct dependency edges, skipping
+SDK targets and their subgraphs. SDK targets merge their own dependency graph,
+including explicitly selected tooling libraries and private source files for type
 resolution. Conflicting SDK file paths are errors; obsolete owned files are
 removed. File lists, source contents, contracts, parsed includes, target
 dependencies and generator changes invalidate generation. Unchanged outputs are
 preserved. Generated JSON files are tool interchange files, not author inputs.
+
+## Host SDK builds
+
+Each host using `entisium.luau-definitions` has a separate `<host>-sdk` phony
+target using `entisium.luau-sdk` and `set_values("luau.sdk.host", "<host>")`.
+The host and SDK share one dependency list in their xmake file. SDK targets may
+add tooling libraries, such as `entisium-luau-playtest`, without registering those
+libraries in the game VM. Missing host dependencies in an SDK are errors.
+
+```sh
+xmake build -y entisium-runtime-host-sdk
+xmake build -y entisium-luau-host-sdk
+# In a WASM configuration:
+xmake build -y entisium-editor-runtime-sdk
+```
+
+Building an SDK builds the required libraries and reflection metadata but does
+not compile or link the host executable. Building the host also builds its SDK.
+Outputs are isolated at `<host-targetdir>/luau-definitions/<host-name>/`.
+Consumers read `entisium.luau-definitions.output` from the target. The native LSP
+uses the `entisium-runtime-host` SDK by default; `--definitions-index` selects a
+different SDK. The Editor accepts `ETS_ENTISIUM_LUAU_DEFINITIONS_INDEX`.
+
+SDK generation tracks reflection manifests, the merged library catalog, manual
+runtime declarations and generator changes. `sdk-files.json` lists all published
+files; a missing output triggers regeneration. Unchanged inputs skip defgen,
+and unchanged generated content preserves file timestamps. WASM LSP packaging
+tracks these files as link inputs so changes refresh the embedded SDK.
+
+Playtest modules are ordinary `entisium.luau_library` targets with explicit names
+and dependencies in `scripting/libraries/playtest/xmake.lua`. Their sources are
+embedded in the standalone host and published from its catalog; the host loader
+and defgen contain no per-module source paths.
 
 ## Ownership
 

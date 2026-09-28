@@ -76,28 +76,15 @@ error_lines(std::string source, const std::string_view extra_definitions = {}) {
     applyRequiredFlags();
 
     MemoryFileResolver files;
-    for (const auto& [alias, path] :
-         std::vector<std::pair<std::string, std::string>> {
-             {"@schema", "scripting/libraries/schema/schema.luau"},
-             {"@http", "scripting/libraries/http/http.luau"},
-             {"@task", "scripting/libraries/task/task.luau"},
-             {"@context/core", "scripting/libraries/context/context.luau"},
-             {"@context", "scripting/libraries/playtest/context.luau"},
-             {"@playtest/game", "scripting/libraries/playtest/game.luau"},
-             {"@playtest/scheduler",
-              "scripting/libraries/playtest/scheduler.luau"},
-             {"@ai", "scripting/libraries/ai/ai.luau"},
-         }) {
-        std::ifstream input(std::filesystem::path {ETS_PROJECT_ROOT} / path);
-        REQUIRE(input);
-        files.sources[alias] =
-            std::string(std::istreambuf_iterator<char> {input}, {});
-    }
     std::ifstream catalog_file(ETS_TEST_LUAU_CATALOG);
     REQUIRE(catalog_file);
     const auto catalog = nlohmann::json::parse(catalog_file);
     for (const auto& library : catalog.at("libraries")) {
         const auto name = library.at("name").get<std::string>();
+        const auto source = library.at("source").get<std::string>();
+        if (!source.empty()) {
+            files.sources[name] = source;
+        }
         const auto native = library.at("native").get<std::string>();
         if (!native.empty()) {
             const auto alias = library.at("source").get<std::string>().empty() ?

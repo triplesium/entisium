@@ -37,7 +37,7 @@ const host = createEditorHost({
     luauLspExecutable: process.env.ETS_ENTISIUM_LSP_PATH?.trim() || undefined,
     luauDefinitionsIndex:
         process.env.ETS_ENTISIUM_LUAU_DEFINITIONS_INDEX?.trim() ||
-        resolve(runtimeDirectory, "luau-definitions", "index.json"),
+        resolve(runtimeDirectory, "luau-definitions", "entisium-editor-runtime", "index.json"),
 });
 
 const address = await host.listen();

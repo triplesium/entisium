@@ -24,10 +24,20 @@ local function stable_json(value)
 end
 
 local function library_dependencies(target, transitive)
-    local result = {}
-    for _, dep in pairs(transitive and target:orderdeps() or target:deps()) do
-        if dep:rule("entisium.luau_library") then table.insert(result, dep) end
+    local result, visited = {}, {}
+    local function visit(owner)
+        -- deps() also contains transitive targets; use declared edges to preserve boundaries.
+        for _, name in ipairs(table.wrap(owner:get("deps"))) do
+            local dep = assert(owner:dep(name))
+            -- SDK-only dependencies describe editor APIs, not executable imports.
+            if not visited[dep:name()] and not dep:rule("entisium.luau-sdk") then
+                visited[dep:name()] = true
+                if dep:rule("entisium.luau_library") then table.insert(result, dep) end
+                if transitive then visit(dep) end
+            end
+        end
     end
+    visit(target)
     table.sort(result, function(a, b) return a:name() < b:name() end)
     return result
 end
@@ -132,7 +142,8 @@ function generate_library(target)
 end
 
 function configure_catalog(target)
-    if target:kind() ~= "binary" and target:kind() ~= "shared" then return end
+    local sdk = target:rule("entisium.luau-sdk")
+    if not sdk and target:kind() ~= "binary" and target:kind() ~= "shared" then return end
     local scripting = false
     for _, dep in ipairs(target:orderdeps()) do
         if dep:name() == "entisium-scripting-core" then scripting = true end
@@ -141,7 +152,7 @@ function configure_catalog(target)
     local output = path.join(target:autogendir(), "luau-catalog")
     target:set("values", "entisium.luau-catalog.output", output)
     target:set("values", "entisium.luau-library.manifest", path.join(output, "libraries.json"))
-    target:add("files", path.join(output, "catalog.cpp"), {always_added = true})
+    if not sdk then target:add("files", path.join(output, "catalog.cpp"), {always_added = true}) end
 end
 
 function generate_catalog(target)
@@ -171,11 +182,13 @@ function generate_catalog(target)
         marks[library.name] = 2
     end
     for _, library in ipairs(libraries) do visit(library) end
-    write_changed(path.join(output, "catalog.cpp"),
-        '#include "scripting/library.hpp"\nnamespace ets {\n' .. table.concat(declarations, "\n") ..
+    if not target:rule("entisium.luau-sdk") then
+        write_changed(path.join(output, "catalog.cpp"),
+            '#include "scripting/library.hpp"\nnamespace ets {\n' .. table.concat(declarations, "\n") ..
         '\nstd::span<const LuauLibraryDefinition> default_luau_libraries() {\n' ..
         'static const auto libraries = [] { std::vector<LuauLibraryDefinition> result;\n' .. table.concat(calls, "\n") ..
         '\nreturn result; }(); return libraries;\n}\n}\n')
+    end
     write_changed(path.join(output, "libraries.json"),
         stable_json({format = "entisium.luau-libraries", version = 1, libraries = json.mark_as_array(libraries)}))
 end

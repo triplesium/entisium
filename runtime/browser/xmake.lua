@@ -15,12 +15,7 @@ target("entisium-editor-runtime-clock-tests")
 end
 
 if is_plat("wasm") then
-target("entisium-editor-runtime")
-    set_kind("binary")
-    set_policy("build.fence", true)
-    add_rules("entisium.reflect", "entisium.luau-definitions")
-    add_files("src/main.cpp")
-    add_deps(
+local runtime_dependencies = {
         "entisium-core",
         "entisium-editor-runtime-clock",
         "entisium-project-runtime",
@@ -32,7 +27,21 @@ target("entisium-editor-runtime")
         "entisium-ui-rendering",
         "entisium-window-browser",
         "entisium-graphics-webgpu-browser"
-    )
+    }
+target("entisium-editor-runtime-sdk")
+    set_kind("phony")
+    set_default(false)
+    add_rules("entisium.luau-sdk")
+    set_values("luau.sdk.host", "entisium-editor-runtime")
+    add_deps(table.unpack(runtime_dependencies))
+    add_deps("entisium-luau-playtest", {links = false})
+
+target("entisium-editor-runtime")
+    set_kind("binary")
+    set_policy("build.fence", true)
+    add_rules("entisium.reflect", "entisium.luau-definitions")
+    add_files("src/main.cpp")
+    add_deps(table.unpack(runtime_dependencies))
     add_browser_shell(path.join(os.scriptdir(), "shell.html"))
     after_build(function(target)
         local runtime_output = path.join(target:targetdir(), "runtime")

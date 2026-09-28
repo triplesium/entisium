@@ -217,7 +217,11 @@ function run(target)
     print("Web Editor runtime: %s", runtime_directory)
     os.execv(node.program, arguments, {
         curdir = editor_root,
-        setenvs = {ETS_EDITOR_RUNTIME_DIR = runtime_directory},
+        setenvs = {
+            ETS_EDITOR_RUNTIME_DIR = runtime_directory,
+            ETS_ENTISIUM_LUAU_DEFINITIONS_INDEX = os.getenv("ETS_ENTISIUM_LUAU_DEFINITIONS_INDEX") or
+                path.absolute(path.join(runtime:values("entisium.luau-definitions.output"), "index.json")),
+        },
     })
 end
 
@@ -268,6 +272,10 @@ function dev(target, editor_options)
     print("Web Editor runtime: %s", runtime_directory)
     os.execv(npm.program, arguments, {
         curdir = editor_root,
-        setenvs = {ETS_EDITOR_RUNTIME_DIR = runtime_directory},
+        setenvs = {
+            ETS_EDITOR_RUNTIME_DIR = runtime_directory,
+            ETS_ENTISIUM_LUAU_DEFINITIONS_INDEX = os.getenv("ETS_ENTISIUM_LUAU_DEFINITIONS_INDEX") or
+                path.absolute(path.join(runtime:values("entisium.luau-definitions.output"), "index.json")),
+        },
     })
 end

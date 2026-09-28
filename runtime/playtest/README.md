@@ -9,4 +9,6 @@ See the [Playtest guide](../../scripting/docs/playtest.md) for running and writi
 tests, or the [Scripting index](../../scripting/README.md) for libraries and examples.
 
 [DevKit](../../devkit/src/playtest/) starts this host with the project source root,
-test entry and SDK source directory, and coordinates it with the game runtime.
+and test entry, and coordinates it with the game runtime. The Playtest modules
+are embedded through the host catalog; no SDK source directory is needed at
+runtime. The former directory argument is still accepted for compatibility.

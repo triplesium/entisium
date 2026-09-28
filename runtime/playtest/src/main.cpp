@@ -34,23 +34,26 @@ int main(int argc, char** argv) {
     std::unique_ptr<ets::LuauRuntime> owned_runtime;
     try {
         ets::register_generated_reflection();
-        if (argc != 4 &&
-            (argc != 5 || std::string_view(argv[4]) != "--config-stdin")) {
+        // Keep accepting the old SDK-directory argument for existing callers.
+        // All library sources now come from the linked host catalog.
+        const bool configured =
+            argc > 3 && std::string_view(argv[argc - 1]) == "--config-stdin";
+        const int positional = argc - (configured ? 1 : 0);
+        if (positional != 3 && positional != 4) {
             throw std::runtime_error(
                 "Usage: entisium-luau-host <source-root> <entry.luau> "
-                "<sdk-directory>"
+                "[legacy-sdk-directory] [--config-stdin]"
             );
         }
         const auto root = std::filesystem::canonical(argv[1]);
         const auto entry = std::filesystem::canonical(argv[2]);
-        const auto sdk = std::filesystem::canonical(argv[3]);
         if (!inside(root, entry)) {
             throw std::runtime_error("Test entry is outside the source root");
         }
         const auto entry_name =
             "project://" + entry.lexically_relative(root).generic_string();
         owned_runtime = std::make_unique<ets::LuauRuntime>(
-            argc == 5 ? ets::read_luau_host_config(std::cin) : nullptr
+            configured ? ets::read_luau_host_config(std::cin) : nullptr
         );
         auto& runtime = *owned_runtime;
         runtime.enable_host_calls();
@@ -69,28 +72,6 @@ int main(int argc, char** argv) {
                                        Json(entry_name).dump() +
                                        ")\nreturn function() "
                                        "scheduler.run(suite.run) end",
-                        };
-                    }
-                    if (specifier == "@playtest/scheduler") {
-                        return ets::LuauScriptSource {
-                            .name = "@playtest/scheduler",
-                            .content = read_file(sdk / "scheduler.luau"),
-                            .runtime_types = false
-                        };
-                    }
-                    if (specifier == "@playtest/game") {
-                        return ets::LuauScriptSource {
-                            .name = std::string(specifier),
-                            .content = read_file(sdk / "game.luau"),
-                            .runtime_types = false
-                        };
-                    }
-                    if (specifier == "@context") {
-                        const auto path = sdk / "context.luau";
-                        return ets::LuauScriptSource {
-                            .name = std::string(specifier),
-                            .content = read_file(path),
-                            .runtime_types = false
                         };
                     }
                     std::filesystem::path relative;

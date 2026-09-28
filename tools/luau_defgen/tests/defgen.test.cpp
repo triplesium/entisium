@@ -2,6 +2,7 @@
 #include "manifest.hpp"
 #include "type_mapper.hpp"
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <filesystem>
@@ -155,15 +156,14 @@ TEST_CASE(
     const auto output = temporary.path() / "out";
     write(manual, "export type entity = number\n");
     const auto sources = temporary.path() / "sources";
-    const auto runtime = sources / "scripting";
     const auto libraries = sources / "libraries";
     for (const auto* path :
          {"libraries/task/task.luau",
           "libraries/schema/schema.luau",
           "libraries/context/context.luau",
-          "scripting/libraries/playtest/game.luau",
-          "scripting/libraries/playtest/scheduler.luau",
-          "scripting/libraries/playtest/context.luau",
+          "libraries/playtest/game.luau",
+          "libraries/playtest/scheduler.luau",
+          "libraries/playtest/context.luau",
           "libraries/ai/ai.luau",
           "libraries/http/http.luau",
           "libraries/json/json.luau"}) {
@@ -206,7 +206,10 @@ TEST_CASE(
              {"@context/core", "context/context.luau"},
              {"@ai", "ai/ai.luau"},
              {"@http", "http/http.luau"},
-             {"@json", "json/json.luau"}
+             {"@json", "json/json.luau"},
+             {"@context", "playtest/context.luau"},
+             {"@playtest/game", "playtest/game.luau"},
+             {"@playtest/scheduler", "playtest/scheduler.luau"}
          }) {
         library_entries.push_back(
             {{"name", name},
@@ -231,11 +234,11 @@ TEST_CASE(
     const std::vector manifests {manifest};
     const auto database = ets::luau_defgen::load_manifests(manifests);
     write(output / "playtest" / "test.luau", "stale test facade");
+    write(output / "library-files.json", R"(["playtest/test.luau"])");
     const auto summary = ets::luau_defgen::emit_definitions(
         database,
         manual,
         output,
-        runtime,
         library_manifest
     );
 
@@ -274,10 +277,9 @@ TEST_CASE(
              {"libraries/task/task.luau", "task/init.luau"},
              {"libraries/schema/schema.luau", "schema/init.luau"},
              {"libraries/context/context.luau", "context/core.luau"},
-             {"scripting/libraries/playtest/context.luau", "context/init.luau"},
-             {"scripting/libraries/playtest/game.luau", "playtest/game.luau"},
-             {"scripting/libraries/playtest/scheduler.luau",
-              "playtest/scheduler.luau"},
+             {"libraries/playtest/context.luau", "context/init.luau"},
+             {"libraries/playtest/game.luau", "playtest/game.luau"},
+             {"libraries/playtest/scheduler.luau", "playtest/scheduler.luau"},
              {"libraries/ai/ai.luau", "ai/init.luau"},
              {"libraries/http/http.luau", "http/init.luau"},
              {"libraries/json/json.luau", "json/init.luau"},
@@ -315,7 +317,6 @@ TEST_CASE(
         database,
         manual,
         output,
-        runtime,
         library_manifest
     );
     CHECK(native_summary.class_count == summary.class_count);
@@ -327,6 +328,29 @@ TEST_CASE(
     CHECK(read(output / "internal/native.luau") == native_contract);
     CHECK(read(output / "native/helper.luau") == "return {value = 42}");
     CHECK_FALSE(std::filesystem::exists(output / "json/init.luau"));
+    CHECK_FALSE(std::filesystem::exists(output / "playtest/game.luau"));
+    CHECK_FALSE(std::filesystem::exists(output / "playtest/scheduler.luau"));
+    CHECK_FALSE(std::filesystem::exists(output / "context/init.luau"));
+    CHECK(read(output / ".luaurc").find("\"playtest\"") == std::string::npos);
+    const auto inventory =
+        nlohmann::json::parse(read(output / "sdk-files.json"));
+    for (const auto& file : inventory) {
+        CHECK(
+            std::filesystem::is_regular_file(output / file.get<std::string>())
+        );
+    }
+    CHECK(
+        std::find(inventory.begin(), inventory.end(), "modules/math.luau") !=
+        inventory.end()
+    );
+    CHECK(
+        std::find(inventory.begin(), inventory.end(), "native/helper.luau") !=
+        inventory.end()
+    );
+    CHECK(
+        std::find(inventory.begin(), inventory.end(), "playtest/game.luau") ==
+        inventory.end()
+    );
     CHECK(read(output / "user.luau") == "preserved");
     CHECK(read(output / ".luaurc").find("\"task\"") == std::string::npos);
 }
@@ -341,15 +365,14 @@ TEST_CASE(
     const auto output = temporary.path() / "out";
     write(manual, "");
     const auto sources = temporary.path() / "sources";
-    const auto runtime = sources / "scripting";
     const auto libraries = sources / "libraries";
     for (const auto* path :
          {"libraries/task/task.luau",
           "libraries/schema/schema.luau",
           "libraries/context/context.luau",
-          "scripting/libraries/playtest/game.luau",
-          "scripting/libraries/playtest/scheduler.luau",
-          "scripting/libraries/playtest/context.luau",
+          "libraries/playtest/game.luau",
+          "libraries/playtest/scheduler.luau",
+          "libraries/playtest/context.luau",
           "libraries/ai/ai.luau",
           "libraries/http/http.luau",
           "libraries/json/json.luau"}) {
@@ -409,7 +432,10 @@ TEST_CASE(
              {"@context/core", "context/context.luau"},
              {"@ai", "ai/ai.luau"},
              {"@http", "http/http.luau"},
-             {"@json", "json/json.luau"}
+             {"@json", "json/json.luau"},
+             {"@context", "playtest/context.luau"},
+             {"@playtest/game", "playtest/game.luau"},
+             {"@playtest/scheduler", "playtest/scheduler.luau"}
          }) {
         library_entries.push_back(
             {{"name", name},
@@ -433,7 +459,6 @@ TEST_CASE(
         database,
         manual,
         output,
-        runtime,
         library_manifest
     );
 

@@ -7,7 +7,6 @@ import { runLuau } from "../src/luau/host.js";
 
 const executable = process.env.ETS_LUAU_HOST_PATH ?? resolve("../build/windows/x64/release/entisium-luau-host.exe");
 const root = resolve("tests/fixtures/playtest");
-const sdkDirectory = resolve("../scripting/libraries/playtest");
 
 describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
     it("sends HTTP in the native process without forwarding requests to DevKit", async () => {
@@ -22,7 +21,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
         try {
             const address = server.address();
             if (!address || typeof address === "string") throw new Error("Expected TCP address");
-            await runLuau({ executable, sourceRoot: root, entry: resolve(root, "http.luau"), sdkDirectory,
+            await runLuau({ executable, sourceRoot: root, entry: resolve(root, "http.luau"),
                 async dispatch(method) {
                     expect(method).toBe("http-test.url");
                     return { url: `http://127.0.0.1:${address.port}/` };
@@ -36,20 +35,20 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
         }
     });
     it("decodes JSON for schema validation without host services", async () => {
-        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "json.luau"), sdkDirectory,
+        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "json.luau"),
             async dispatch() { throw new Error("JSON must not call host services"); },
             async dispatchTask() { throw new Error("JSON must not call background services"); },
         });
     });
     it("runs the task core under an independent host", async () => {
-        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "task-core.luau"), sdkDirectory,
+        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "task-core.luau"),
             async dispatch() { throw new Error("Core must not call Playtest"); },
         });
     });
     it("shares results, detaches waiters and closes owned scopes exactly once", async () => {
         let cancelled = 0;
         let cleanup = false;
-        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "task-lifecycle.luau"), sdkDirectory,
+        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "task-lifecycle.luau"),
             async dispatchTask(method, _payload, signal) {
                 if (method === "shared") {
                     await new Promise(resolve => setTimeout(resolve, 100));
@@ -72,7 +71,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
         expect(cleanup).toBe(true);
     });
     it("validates standalone schemas without calling host services", async () => {
-        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "schema.luau"), sdkDirectory,
+        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "schema.luau"),
             async dispatch() { throw new Error("Schema must not call host services"); },
         });
     });
@@ -80,7 +79,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
         const controller = new AbortController();
         let cleaned = false;
         let aborted = false;
-        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "cancel-task.luau"), sdkDirectory,
+        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "cancel-task.luau"),
             signal: controller.signal, allowDuringCancellation: method => method === "cleanup",
             async dispatchTask(_method, _payload, signal) {
                 return new Promise((_, reject) => {
@@ -98,7 +97,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
         let observed = false;
         let resolved = false;
         let cancelled = 0;
-        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "tasks.luau"), sdkDirectory,
+        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "tasks.luau"),
             async dispatchTask(method, _payload, signal) {
                 if (method === "failure") throw new Error("provider failed");
                 if (method === "late") { await new Promise(resolve => setTimeout(resolve, 15)); return {}; }
@@ -125,7 +124,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
     it("samples deduplicated context graphs and preserves query semantics and metadata", async () => {
         let batches = 0;
         let encoded: any;
-        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "context.luau"), sdkDirectory,
+        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "context.luau"),
             async dispatch(method, input) {
                 const payload = input as any;
                 if (method === "encoded") { encoded = JSON.parse(payload.text); return {}; }
@@ -151,7 +150,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
     it("imports game types without installing plugins and shares one simulation clock", async () => {
         let ticks = 0;
         const cleaned: string[] = [];
-        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "scheduler.luau"), sdkDirectory,
+        await runLuau({ executable, sourceRoot: root, entry: resolve(root, "scheduler.luau"),
             async dispatch(method, input) {
                 const payload = input as any;
                 if (method === "game.advance") { ticks++; return { ticks: 1, delta: 1 / 60, stopped: false }; }
@@ -169,7 +168,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
 
     it("fails on a child error and runs all registered cleanup", async () => {
         const cleaned: string[] = [];
-        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "failure.luau"), sdkDirectory,
+        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "failure.luau"),
             async dispatch(method, payload) {
                 if (method === "cleanup") cleaned.push((payload as any).name);
                 return { ticks: 1, delta: 1 / 60, stopped: false };
@@ -179,7 +178,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
     });
 
     it("interrupts runaway scripts", async () => {
-        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "runaway.luau"), sdkDirectory,
+        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "runaway.luau"),
             async dispatch() { throw new Error("Unexpected request"); },
         })).rejects.toThrow("budget");
     });
@@ -187,7 +186,7 @@ describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
     it("cancels a suspended test and permits input cleanup", async () => {
         const controller = new AbortController();
         let cleaned = false;
-        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "cancel.luau"), sdkDirectory,
+        await expect(runLuau({ executable, sourceRoot: root, entry: resolve(root, "cancel.luau"),
             signal: controller.signal,
             allowDuringCancellation: method => method === "game.input",
             async dispatch(method) {

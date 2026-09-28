@@ -27,6 +27,12 @@ the scheduler described in the Task and Playtest guides.
 Each library keeps its Luau source, native C++ adapter, xmake target and tests
 together under `libraries/`. See [Library authoring](docs/luau-libraries.md) for
 native, pure Luau and mixed libraries, generated bindings, and SDK publication.
+Playtest modules use the same library rule. The standalone host links the
+`entisium-luau-playtest` bundle; game hosts select it only in their SDK targets
+so the Editor can type-check tests without exposing Playtest in the game VM.
+See [Host SDK builds](docs/luau-libraries.md#host-sdk-builds) for independent
+SDK targets and output paths.
+
 ## Implementation boundaries
 
 - [engine/scripting](../engine/scripting/): VM, compiler, reflection bridge,

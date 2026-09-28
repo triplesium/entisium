@@ -26,7 +26,7 @@ if has_config("tests") then
         )
         add_includedirs("src", "../../engine/scripting/include")
         add_packages("luau-lsp")
-        add_deps("entisium-scripting")
+        add_deps("entisium-scripting", "entisium-luau-playtest")
         after_load(function(target)
             local catalog = path.absolute(path.join(target:autogendir(), "luau-catalog", "libraries.json")):gsub("\\", "/")
             target:add("defines", 'ETS_TEST_LUAU_CATALOG="' .. catalog .. '"')
@@ -47,7 +47,7 @@ target("entisium-lsp-wasm")
     remove_files("src/main.cpp")
     add_includedirs("src", "../../engine/scripting/include")
     add_packages("luau-lsp")
-    add_deps("entisium-editor-runtime", {links = false})
+    add_deps("entisium-editor-runtime-sdk", {links = false})
     add_cxflags(
         "-pthread",
         "-fwasm-exceptions",
@@ -71,15 +71,23 @@ target("entisium-lsp-wasm")
         {force = true}
     )
     after_load(function(target)
-        local definitions = path.join(
-            assert(target:dep("entisium-editor-runtime")):targetdir(),
-            "luau-definitions"
-        )
+        local definitions = assert(target:dep("entisium-editor-runtime-sdk"))
+            :values("entisium.luau-definitions.output")
         target:add(
             "ldflags",
             "--preload-file=" .. definitions ..
                 "@/entisium/luau-definitions",
             {force = true}
         )
+    end)
+    before_link(function(target)
+        local json = import("core.base.json")
+        local definitions = assert(target:dep("entisium-editor-runtime-sdk"))
+            :values("entisium.luau-definitions.output")
+        local inventory = path.join(definitions, "sdk-files.json")
+        target:data_add("linkdepfiles", inventory)
+        for _, file in ipairs(json.loadfile(inventory)) do
+            target:data_add("linkdepfiles", path.join(definitions, file))
+        end
     end)
 end

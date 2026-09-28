@@ -15,7 +15,6 @@ target("entisium-scripting-core")
     )
     add_packages("luau", "nlohmann_json", {public = true})
 
-
 if not is_plat("wasm") then
     target("entisium-luau-fixture")
         set_kind("static")
@@ -42,9 +41,21 @@ if not is_plat("wasm") then
     target("entisium-luau-catalog-tests")
         set_kind("binary")
         set_default(false)
-        add_rules("entisium.test")
+        add_rules("entisium.test", "entisium.luau-definitions")
         add_files("tests/library_fixture/catalog.test.cpp")
         add_deps("entisium-luau-multifile")
+        after_load(function(target)
+            local sdk = assert(target:dep("entisium-luau-catalog-tests-sdk"))
+            local output = path.absolute(sdk:values("entisium.luau-definitions.output")):gsub("\\", "/")
+            target:add("defines", 'ETS_TEST_SDK_DIRECTORY="' .. output .. '"')
+        end)
+
+    target("entisium-luau-catalog-tests-sdk")
+        set_kind("phony")
+        set_default(false)
+        add_rules("entisium.luau-sdk")
+        set_values("luau.sdk.host", "entisium-luau-catalog-tests")
+        add_deps("entisium-luau-multifile", "entisium-luau-json")
 
     target("entisium-scripting-query-benchmark")
         set_kind("binary")

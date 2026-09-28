@@ -40,7 +40,7 @@ export async function runNative(script: string, config: NativeHostConfiguration)
     try {
         const entry = join(root, "test.luau");
         await writeFile(entry, `local ai = require("@ai")\nlocal schema = require("@schema")\nlocal task = require("@task")\nlocal http = require("@http")\nreturn {run = function()\n${script}\nend}`);
-        await runLuau({executable, sourceRoot: root, entry, sdkDirectory: resolve("../scripting/libraries/playtest"), configuration: config,
+        await runLuau({executable, sourceRoot: root, entry, configuration: config,
             async dispatch() { throw new Error("AI must not call Node services"); },
             async dispatchTask() { throw new Error("AI must not call Node background services"); },
         });

@@ -32,7 +32,22 @@ rule("entisium.luau-definitions")
         }).configure_target(target)
     end)
 
-    after_build(function(target)
+rule_end()
+
+rule("entisium.luau-sdk")
+    on_load(function(target)
+        import("luau_defgen.rules", {
+            rootdir = path.join(os.projectdir(), "tools")
+        }).configure_sdk(target)
+    end)
+
+    after_load(function(target)
+        import("luau_defgen.rules", {
+            rootdir = path.join(os.projectdir(), "tools")
+        }).configure_sdk_output(target)
+    end)
+
+    on_build(function(target)
         import("luau_defgen.rules", {
             rootdir = path.join(os.projectdir(), "tools")
         }).generate(target)

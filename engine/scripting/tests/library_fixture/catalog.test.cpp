@@ -2,6 +2,7 @@
 
 #include <array>
 #include <catch2/catch_test_macros.hpp>
+#include <filesystem>
 #include <lua.h>
 #include <lualib.h>
 
@@ -13,6 +14,13 @@ TEST_CASE(
     CHECK(ets::is_luau_library("@fixture"));
     CHECK(ets::is_luau_library("@multifile"));
     CHECK_FALSE(ets::is_luau_library("@http"));
+    // JSON is selected only by this host's SDK target.
+    CHECK_FALSE(ets::is_luau_library("@json"));
+    CHECK(
+        std::filesystem::is_regular_file(
+            std::filesystem::path(ETS_TEST_SDK_DIRECTORY) / "json/init.luau"
+        )
+    );
     for (int i = 0; i < 2; ++i) {
         auto* state = luaL_newstate();
         luaL_openlibs(state);

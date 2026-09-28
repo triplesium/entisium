@@ -11,7 +11,6 @@ int main(int argc, char** argv) {
     std::vector<std::filesystem::path> manifests;
     std::filesystem::path manual_definitions;
     std::filesystem::path output_directory;
-    std::filesystem::path runtime_directory;
     std::filesystem::path libraries_directory;
 
     CLI::App app {
@@ -32,8 +31,6 @@ int main(int argc, char** argv) {
            "Generated definition directory"
     )
         ->required();
-    app.add_option("--runtime", runtime_directory, "Runtime source directory")
-        ->required();
     app.add_option(
            "--libraries",
            libraries_directory,
@@ -48,7 +45,6 @@ int main(int argc, char** argv) {
             database,
             manual_definitions,
             output_directory,
-            runtime_directory,
             libraries_directory
         );
         std::cout << "Generated Luau definitions for " << summary.class_count
