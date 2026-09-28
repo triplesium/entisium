@@ -1,0 +1,12 @@
+local scheduler = require("@playtest/scheduler")
+local task = require("@task")
+local game = require("@playtest/game")
+return function()
+    task.on_cleanup(function() scheduler.host("cleanup", { name = "root" }) end)
+    task.spawn(function()
+        task.on_cleanup(function() scheduler.host("cleanup", { name = "child" }) end)
+        game.next_step():await()
+        error("child failed")
+    end)
+    game.delay(10):await()
+end

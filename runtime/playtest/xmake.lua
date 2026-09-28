@@ -1,0 +1,6 @@
+target("entisium-luau-host")
+    set_kind("binary")
+    add_rules("entisium.reflect")
+    add_files("src/*.cpp")
+    add_deps("entisium-scripting", "entisium-runtime-host-core")
+    add_packages("nlohmann_json")

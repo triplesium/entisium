@@ -1,0 +1,43 @@
+local game = require("@playtest/game")
+local scheduler = require("@playtest/scheduler")
+local task = require("@task")
+return function()
+    local observed = false
+    task.spawn(function()
+        scheduler.host("observe")
+        observed = true
+        game.next_step():await()
+    end)
+    local request = scheduler.request("slow", {})
+    local result = task.timeout(request, 1):await()
+    assert(result.answer == 42 and observed)
+    game.next_step():await()
+    local ok, message = pcall(function()
+        scheduler.request("failure", {}):await()
+    end)
+    assert(not ok and string.find(message, "provider failed", 1, true))
+    local timed = scheduler.request("never", {})
+    ok, message = pcall(function()
+        task.timeout(timed, 0.02):await()
+    end)
+    assert(not ok and string.find(message, "Wall timeout", 1, true))
+    assert(timed:status() == "pending", "Timeout must detach without cancelling shared work")
+    timed:cancel()
+    ok, message = pcall(function()
+        task.timeout(scheduler.request("late", {}), 0.005):await()
+    end)
+    assert(not ok and string.find(message, "Wall timeout", 1, true), "Late completion must not beat the wall deadline")
+    local nested = (task.all {
+        winner = task.spawn(function()
+            return (task.race { fast = game.delay(0), slow = scheduler.request("never", {}) }):await()
+        end),
+        frame = game.next_step(),
+    }):await()
+    assert(nested.winner.kind == "fast")
+    local slow = scheduler.request("never", {})
+    local race = (task.race { fast = game.delay(0), slow = slow }):await()
+    assert(race.kind == "fast")
+    assert(slow:status() == "pending", "Race must not cancel shared losers")
+    slow:cancel()
+    scheduler.request("never", {}) -- Disposed at root completion, even without await.
+end

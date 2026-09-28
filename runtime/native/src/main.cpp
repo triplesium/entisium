@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <exception>
+#include <iostream>
 #include <string_view>
 #include <utility>
 
@@ -15,9 +16,12 @@ int main(int argc, char** argv) {
     std::setvbuf(stderr, nullptr, _IONBF, 0);
     runtime_host::RuntimeHostOptions options;
     const char* project_path = nullptr;
+    bool config_stdin = false;
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument(argv[index]);
-        if (argument == "--hidden") {
+        if (argument == "--config-stdin") {
+            config_stdin = true;
+        } else if (argument == "--hidden") {
             options.hidden = true;
         } else if (argument.starts_with("--") || project_path != nullptr) {
             error("Unexpected argument: {}", argument);
@@ -42,6 +46,9 @@ int main(int argc, char** argv) {
     }
 
     try {
+        if (config_stdin) {
+            options.luau_config = read_luau_host_config(std::cin);
+        }
         runtime_host::RuntimeHostApplication application(
             std::move(*project),
             options

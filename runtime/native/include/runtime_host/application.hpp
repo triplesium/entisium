@@ -2,11 +2,13 @@
 
 #include "app/app.hpp"
 #include "project/project.hpp"
+#include "scripting/host_config.hpp"
 
 namespace ets::runtime_host {
 
 struct RuntimeHostOptions {
     bool hidden {false};
+    std::shared_ptr<const LuauHostConfig> luau_config;
 };
 
 class RuntimeHostApplication {

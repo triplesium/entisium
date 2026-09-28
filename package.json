@@ -14,6 +14,7 @@
         "build:demo": "npm run build:shared && npm exec --workspace @entisium/editor -- vite build --mode demo",
         "agent": "node --conditions=development --import tsx agent/src/cli/main.ts",
         "runtime:mcp": "node --conditions=development --import tsx devkit/src/mcp/main.ts",
+        "playtest": "node --conditions=development --import tsx devkit/src/playtest/main.ts",
         "typecheck": "npm run build:shared && npm run typecheck:evals --workspace @entisium/agent && npm run typecheck --workspace @entisium/editor",
         "test": "npm run build:shared && npm run test --workspaces --if-present",
         "build:server": "npm run build:shared && tsc -p editor/tsconfig.server.json",

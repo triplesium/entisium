@@ -1,0 +1,3 @@
+name: Playtest Basics
+asset_directory: assets
+plugin: project://main.luau#GamePlugin

@@ -3,6 +3,7 @@ target("entisium-runtime-host-core")
     add_headerfiles("include/**.hpp")
     add_files(
         "src/application.cpp",
+        "src/test_snapshot.cpp",
         "src/quick_save.cpp",
         "src/snapshot_archive.cpp"
     )
@@ -53,3 +54,4 @@ target("entisium-runtime-host-tests")
     add_rules("entisium.test")
     add_files("tests/*.cpp")
     add_deps("entisium-runtime-host-core")
+    add_packages("nlohmann_json")

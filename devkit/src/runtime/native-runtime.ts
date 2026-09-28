@@ -1,3 +1,4 @@
+import { configuredLuauHost, encodeHostConfiguration, type NativeHostConfiguration } from "../luau/configuration.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { access, realpath } from "node:fs/promises";
@@ -62,6 +63,7 @@ export class NativeRuntime {
         private readonly executable: string,
         private readonly startupTimeoutMs = 30_000,
         private readonly inspectionTimeoutMs = 30_000,
+        private readonly configuration?: NativeHostConfiguration,
     ) {}
 
     status() {
@@ -156,6 +158,7 @@ export class NativeRuntime {
         try {
             const project = await realpath(resolve(projectFile));
             await access(this.executable);
+            const startup = encodeHostConfiguration(this.configuration ?? await configuredLuauHost(dirname(project)));
             this.server = createServer((request, response) => { void this.handle(request, response); });
             this.server.requestTimeout = 5_000;
             this.server.headersTimeout = 5_000;
@@ -178,10 +181,12 @@ export class NativeRuntime {
             });
             const timeout = setTimeout(() => this.ready?.reject(new Error("Runtime startup timed out.")), this.startupTimeoutMs);
             try {
-                this.child = spawn(this.executable, ["--hidden", project], {
-                    cwd: dirname(project), windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
+                this.child = spawn(this.executable, ["--hidden", "--config-stdin", project], {
+                    cwd: dirname(project), windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
                     env: { ...environment, ETS_RUNTIME_CONTROL_PORT: String(address.port), ETS_RUNTIME_SESSION: this.session },
                 });
+                this.child.stdin?.on("error", () => this.fail("Runtime configuration pipe closed."));
+                this.child.stdin?.end(startup);
                 const append = (chunk: Buffer) => { this.log = (this.log + chunk.toString("utf8")).slice(-64 * 1024); };
                 this.child.stdout?.on("data", append);
                 this.child.stderr?.on("data", append);

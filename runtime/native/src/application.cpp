@@ -18,6 +18,7 @@
 #include "rendering/render_app.hpp"
 #include "runtime_host/quick_save.hpp"
 #include "runtime_host/snapshot_archive.hpp"
+#include "runtime_host/test_snapshot.hpp"
 #include "runtime_inspection/provider.hpp"
 #include "runtime_inspection/registry.hpp"
 #include "runtime_inspection_ecs/entity.hpp"
@@ -28,6 +29,7 @@
 #include "runtime_protocol/playtest_plugin.hpp"
 #include "runtime_protocol/probe.hpp"
 #include "scripting/playtest_segment.hpp"
+#include "scripting/plugin.hpp"
 #include "scripting/runtime.hpp"
 #include "snapshot_runtime/adapters.hpp"
 #include "snapshot_runtime_asset/adapters.hpp"
@@ -590,6 +592,34 @@ Status<runtime_inspection::InspectionError>
 register_playtest_inspection_providers(
     runtime_inspection::InspectionRegistry& registry
 ) {
+    for (const auto* name : {"test.input", "test.advance", "test.snapshot"}) {
+        auto added = registry.add(
+            runtime_inspection::InspectionDescriptor {
+                .id = name,
+                .label = name,
+                .description = "External Luau test host operation",
+                .schema = std::string(name) + ".v1",
+                .read_only = std::string_view(name) == "test.snapshot",
+                .cost = runtime_inspection::InspectionCost::Low,
+                .request_schema_json = R"({"type":"object"})",
+                .response_schema_json = R"({"type":"object"})",
+            },
+            [](World&, std::string_view)
+                -> Result<std::string, runtime_inspection::InspectionError> {
+                return failure(
+                    runtime_inspection::InspectionError {
+                        .kind = runtime_inspection::InspectionErrorKind::
+                            Unsupported,
+                        .message = "External testing requires supervised "
+                                   "native execution",
+                    }
+                );
+            }
+        );
+        if (!added) {
+            return added;
+        }
+    }
     auto status = registry.add(
         runtime_inspection::InspectionDescriptor {
             .id = std::string(c_playtest_interfaces_id),
@@ -846,6 +876,7 @@ RuntimeHostApplication::RuntimeHostApplication(
         )
         .add_systems(Last, request_quick_save_hotkeys);
     m_app.add_plugin<snapshot_runtime::SnapshotRuntimePlugin>();
+    m_app.add_plugin(LuauScriptingPlugin {options.luau_config});
     configure_project_runtime(m_app, std::move(project));
     m_app.add_plugin<OpenGLGlfwPlugin>()
         .add_plugin<RenderingPlugin>()
@@ -1471,6 +1502,7 @@ void RuntimeHostApplication::run() {
         };
 
         auto dispatch_manual_inspection = [this,
+                                           &frame_count,
                                            &execute_playtest_capture,
                                            &execute_playtest_observe,
                                            &execute_playtest_step,
@@ -1501,8 +1533,65 @@ void RuntimeHostApplication::run() {
                 }
                 Result<std::string, runtime_protocol::RuntimeInspectionError>
                     result;
-                if (request.provider == c_playtest_observe_id &&
-                    request.schema == c_playtest_observe_schema) {
+                if (request.provider == "test.input" &&
+                    request.schema == "test.input.v1") {
+                    auto applied = begin_keyboard_step(
+                        m_app.world(),
+                        request.payload_json
+                    );
+                    if (!applied) {
+                        result = failure(playtest_error(applied.error()));
+                    } else {
+                        result = std::string {"{}"};
+                    }
+                } else if (
+                    request.provider == "test.advance" &&
+                    request.schema == "test.advance.v1"
+                ) {
+                    const auto payload = Json::parse(request.payload_json);
+                    if (!payload.is_object() || payload.size() != 1 ||
+                        !payload.contains("ticks") ||
+                        !payload.at("ticks").is_number_unsigned()) {
+                        throw std::runtime_error(
+                            "test.advance requires an integer ticks field"
+                        );
+                    }
+                    const auto ticks = payload.at("ticks").get<uint64>();
+                    if (ticks < 1 || ticks > 600) {
+                        throw std::runtime_error(
+                            "test.advance ticks must be between 1 and 600"
+                        );
+                    }
+                    uint32 completed = 0;
+                    for (; completed < ticks &&
+                           !m_app.resource<AppStates>().should_stop;
+                         ++completed) {
+                        update_frame();
+                        ++frame_count;
+                    }
+                    result = Json {
+                        {"ticks", completed},
+                        {"delta", c_playtest_fixed_delta},
+                        {"frame", frame_count},
+                        {"stopped", m_app.resource<AppStates>().should_stop}
+                    }.dump();
+                } else if (
+                    request.provider == "test.snapshot" &&
+                    request.schema == "test.snapshot.v1"
+                ) {
+                    auto snapshot = Json::parse(inspect_test_snapshot(
+                        m_app.world(),
+                        request.payload_json
+                    ));
+                    snapshot["frame"] = frame_count;
+                    snapshot["simulation_time"] =
+                        static_cast<double>(frame_count) *
+                        c_playtest_fixed_delta;
+                    result = snapshot.dump();
+                } else if (
+                    request.provider == c_playtest_observe_id &&
+                    request.schema == c_playtest_observe_schema
+                ) {
                     result = execute_playtest_observe(request);
                 } else if (
                     request.provider == c_playtest_step_id &&
