@@ -374,6 +374,9 @@ int dynamic_event_iterator_next(lua_State* state) {
 
 int luau_borrowed_iter(lua_State* state) {
     auto object = check_luau_object(state, 1);
+    if (push_luau_container_iterator(state, object)) {
+        return 1;
+    }
     auto* query = object.ref.try_get<DynamicQuery>();
     if (query != nullptr) {
         auto* iterator = new (lua_newuserdata(state, sizeof(LuauQueryIterator)))

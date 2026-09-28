@@ -532,6 +532,9 @@ rule_end()
 
 add_cxxflags("cl::/Zc:preprocessor")
 
+includes("tools/luau_libraries")
+add_rules("entisium.luau.catalog")
+
 if is_plat("wasm") then
     includes("tools/reflgen")
     includes("tools/luau_defgen")

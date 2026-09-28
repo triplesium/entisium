@@ -1,0 +1,7 @@
+target("entisium-luau-ai")
+    set_kind("static")
+    add_rules("entisium.luau_library")
+    add_files("*.cpp")
+    add_headerfiles("*.hpp")
+    add_files("ai.luau")
+    add_deps("entisium-luau-task", "entisium-luau-schema", "entisium-luau-http", "entisium-luau-json")

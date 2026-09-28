@@ -109,6 +109,7 @@ class_json(const ClassInfo& cls, const std::filesystem::path& root_dir) {
         if (is_reflected_method(cls, method)) {
             Json method_json {
                 {"name", method.name},
+                {"annotations", annotations_json(method.annotations)},
                 {"returnCppType", method.type_name},
                 {"parameters", parameters_json(method.parameters)},
                 {"static", method.is_static},

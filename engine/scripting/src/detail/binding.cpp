@@ -35,6 +35,8 @@ void install_luau_borrowed_object_metatable(lua_State* state) {
         lua_setfield(state, metatable, "__call");
         lua_pushcfunction(state, luau_borrowed_iter, "borrowed.__iter");
         lua_setfield(state, metatable, "__iter");
+        lua_pushcfunction(state, luau_container_length, "container.__len");
+        lua_setfield(state, metatable, "__len");
 
         constexpr std::array object_tags {
             LuauObjectTag::BorrowedRead,

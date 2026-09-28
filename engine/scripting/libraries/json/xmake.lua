@@ -1,0 +1,5 @@
+target("entisium-luau-json")
+    set_kind("static")
+    add_rules("entisium.luau_library")
+    add_files("*.cpp")
+    add_headerfiles("*.hpp")

@@ -14,11 +14,31 @@ export type u64 = number
 export type f32 = number
 export type f64 = number
 
+-- Reflected containers provide indexing, length and generalized iteration.
+-- They are userdata at runtime; table library functions and index assignment
+-- are not supported, even when structural typing accepts them.
+export type ReflectedSequence<T> = typeof(setmetatable(
+    {} :: {[number]: T},
+    {} :: {
+        __len: (any) -> number,
+        __iter: (any) -> (() -> (number, T)),
+    }
+))
+export type ReflectedMap<K, V> = typeof(setmetatable(
+    {} :: {[K]: V},
+    {} :: {
+        __len: (any) -> number,
+        __iter: (any) -> (() -> (K, V)),
+    }
+))
+
 -- Reflected type values carry this phantom field in the generated declarations.
 -- It lets generic runtime methods infer T from a value such as Transform2d.
 export type TypeToken<T> = {
     __ets_type: T?,
 }
+
+-- Native bridge functions consumed by the typed Playtest adapters.
 
 -- Asset handles retain the asset type selected by a TypeToken<T> argument.
 export type Handle<T> = {

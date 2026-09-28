@@ -131,7 +131,7 @@ class ScriptWorkspace final {
   public:
     ScriptWorkspace() :
         frontend(
-            &files,
+            (enable_language_features(), &files),
             &configs,
             Luau::FrontendOptions {.retainFullTypeGraphs = true}
         ) {

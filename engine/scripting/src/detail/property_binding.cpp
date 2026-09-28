@@ -754,6 +754,9 @@ void owned_direct_set(
 
 int borrowed_index(lua_State* state) {
     auto object = check_luau_object(state, 1);
+    if (push_luau_container_index(state, object)) {
+        return 1;
+    }
     const char* key = luaL_checkstring(state, 2);
     if (push_luau_dynamic_param_member(state, object.ref.type_id(), key)) {
         return 1;

@@ -10,6 +10,7 @@ namespace ets::reflgen {
 struct HeaderParseOutput {
     ParseResult result;
     std::vector<std::string> dependencies;
+    bool has_errors {false};
 };
 
 class HeaderParser {

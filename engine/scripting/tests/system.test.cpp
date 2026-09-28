@@ -270,6 +270,7 @@ TEST_CASE(
     "Luau system loader exposes ScriptPrelude reflected names",
     "[scripting_luau][system][namespace][prelude]"
 ) {
+    register_generated_reflection();
     auto& registry = Registry::instance();
     registry
         .register_cls<luau_system_test::Config>(

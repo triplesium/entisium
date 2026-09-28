@@ -152,7 +152,8 @@ bool has_annotation(
 }
 
 bool is_reflected_class(const ClassInfo& cls) {
-    return cls.name != "ets::Registry";
+    return cls.name != "ets::Registry" &&
+           !has_annotation(cls.annotations, "LuauLibrary");
 }
 
 bool is_reflected_property(const MemberInfo& property) {

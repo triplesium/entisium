@@ -12,6 +12,7 @@
 #include "ecs/fwd.hpp"
 #include "refl/enum.hpp"
 #include "scripting/detail/exported_type.hpp"
+#include "scripting/library.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -2096,8 +2097,7 @@ detail::luau_compiler::ModuleMetadataPass::run(
 }
 
 bool is_native_luau_module(std::string_view specifier) {
-    constexpr std::string_view prefix = "@entisium/";
-    return specifier.starts_with(prefix) && specifier.size() > prefix.size();
+    return is_luau_library(specifier) || specifier.starts_with("@entisium/");
 }
 
 Result<std::vector<std::string>, LuauScriptError>
@@ -2113,7 +2113,8 @@ extract_luau_script_imports(const LuauScriptSource& source) {
 
 Result<LuauModuleMetadata, LuauScriptError> compile_luau_module_metadata(
     const LuauScriptSource& source,
-    bool snapshot_safe
+    bool snapshot_safe,
+    bool allow_return
 ) {
     if (!enable_luau_language_features()) {
         return failure(
@@ -2129,7 +2130,8 @@ Result<LuauModuleMetadata, LuauScriptError> compile_luau_module_metadata(
         return failure(declaration_error(std::move(parsed.error().message)));
     }
     auto& root = parsed->root();
-    if (std::ranges::any_of(root.body, [](const AstStat* statement) {
+    if (!allow_return &&
+        std::ranges::any_of(root.body, [](const AstStat* statement) {
             return statement->is<AstStatReturn>();
         })) {
         return failure(
@@ -2200,9 +2202,11 @@ Result<LuauScriptModuleArtifact, LuauScriptError> compile_luau_script_module(
     }
     auto& root = parsed->root();
     const auto& compile_options = session.options();
-    if (std::ranges::any_of(root.body, [](const AstStat* statement) {
+    const bool has_return =
+        std::ranges::any_of(root.body, [](const AstStat* statement) {
             return statement->is<AstStatReturn>();
-        })) {
+        });
+    if (has_return && !compile_options.allow_return) {
         return failure(
             declaration_error("top-level return declarations are not supported")
         );
@@ -2334,11 +2338,13 @@ Result<LuauScriptModuleArtifact, LuauScriptError> compile_luau_script_module(
         functions,
         compile_options.optimization_passes
     );
-    auto generated = detail::luau_compiler::RuntimeSourceEmissionPass {}.run(
-        source,
-        runtime_expressions,
-        std::move(lowered.source_patches)
-    );
+    auto generated =
+        has_return ? lowered.source_patches.apply(source) :
+                     detail::luau_compiler::RuntimeSourceEmissionPass {}.run(
+                         source,
+                         runtime_expressions,
+                         std::move(lowered.source_patches)
+                     );
     if (!generated) {
         return failure(std::move(generated.error()));
     }

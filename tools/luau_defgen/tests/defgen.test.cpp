@@ -6,6 +6,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <nlohmann/json.hpp> // IWYU pragma: keep
 #include <string>
 
 namespace {
@@ -105,11 +106,43 @@ TEST_CASE(
         ) == "Handle<T>?"
     );
     CHECK_THROWS(mapper.map_dependent_return(
-        "ets::Result<std::pair<ets::UntypedHandle, ets::UntypedHandle>, Error>"
+        "ets::Result<std::pair<ets::UntypedHandle, "
+        "ets::UntypedHandle>, Error>"
     ));
     CHECK_THROWS(mapper.map_dependent_return("int"));
-    CHECK(mapper.map("std::vector<float>") == "any");
-    CHECK(mapper.unsupported_types().contains("std::vector<float>"));
+    CHECK(mapper.map("std::vector<float>") == "ReflectedSequence<number>");
+    CHECK(
+        mapper.map("std::map<std::string, std::vector<int>>") ==
+        "ReflectedMap<string, ReflectedSequence<number>>"
+    );
+    CHECK(
+        mapper.map_parameter("const std::array<float, 3>&") ==
+        "ReflectedSequence<number>"
+    );
+    CHECK(
+        mapper.map_library_parameter("const std::array<float, 3>&") ==
+        "ReflectedSequence<number> | {number}"
+    );
+    CHECK(
+        mapper.map_parameter("std::vector<int>") == "ReflectedSequence<number>"
+    );
+    CHECK(
+        mapper.map_library_parameter("std::vector<int>") ==
+        "ReflectedSequence<number> | {number}"
+    );
+    CHECK(
+        mapper.map_parameter("std::map<std::string, int>") ==
+        "ReflectedMap<string, number>"
+    );
+    CHECK(
+        mapper.map_library_parameter("std::map<std::string, int>") ==
+        "ReflectedMap<string, number> | {[string]: number}"
+    );
+    CHECK(
+        mapper.map_library_parameter("std::optional<std::vector<int>>") ==
+        "(ReflectedSequence<number> | {number})?"
+    );
+    CHECK_FALSE(mapper.unsupported_types().contains("std::vector<float>"));
 }
 
 TEST_CASE(
@@ -121,6 +154,24 @@ TEST_CASE(
     const auto manual = temporary.path() / "runtime.d.luau";
     const auto output = temporary.path() / "out";
     write(manual, "export type entity = number\n");
+    const auto sources = temporary.path() / "sources";
+    const auto runtime = sources / "runtime";
+    const auto libraries = sources / "libraries";
+    for (const auto* path :
+         {"libraries/task/task.luau",
+          "libraries/schema/schema.luau",
+          "libraries/context/context.luau",
+          "runtime/playtest/luau/game.luau",
+          "runtime/playtest/luau/scheduler.luau",
+          "runtime/playtest/luau/context.luau",
+          "libraries/ai/ai.luau",
+          "libraries/http/http.luau",
+          "libraries/json/json.luau"}) {
+        write(
+            sources / path,
+            std::string("--!strict\n-- ") + path + "\nreturn {}\n"
+        );
+    }
     write(output / "modules" / "stale.luau", "return {}\n");
     write(
         manifest,
@@ -147,11 +198,48 @@ TEST_CASE(
 })"
     );
 
+    nlohmann::ordered_json library_entries = nlohmann::ordered_json::array();
+    for (const auto& [name, file] :
+         std::vector<std::pair<std::string, std::string>> {
+             {"@task", "task/task.luau"},
+             {"@schema", "schema/schema.luau"},
+             {"@context/core", "context/context.luau"},
+             {"@ai", "ai/ai.luau"},
+             {"@http", "http/http.luau"},
+             {"@json", "json/json.luau"}
+         }) {
+        library_entries.push_back(
+            {{"name", name},
+             {"source", read(libraries / file)},
+             {"native", ""},
+             {"globals",
+              name == "@json" ?
+                  "declare extern type SelectedJsonNull with\nend" :
+                  ""},
+             {"dependencies", nlohmann::json::array()}}
+        );
+    }
+    const auto library_manifest = sources / "libraries.json";
+    write(
+        library_manifest,
+        nlohmann::ordered_json {
+            {"format", "entisium.luau-libraries"},
+            {"version", 1},
+            {"libraries", library_entries}
+        }.dump()
+    );
     const std::vector manifests {manifest};
     const auto database = ets::luau_defgen::load_manifests(manifests);
-    const auto summary =
-        ets::luau_defgen::emit_definitions(database, manual, output);
+    write(output / "playtest" / "test.luau", "stale test facade");
+    const auto summary = ets::luau_defgen::emit_definitions(
+        database,
+        manual,
+        output,
+        runtime,
+        library_manifest
+    );
 
+    CHECK_FALSE(std::filesystem::exists(output / "playtest" / "test.luau"));
     CHECK(summary.class_count == 1);
     const auto globals = read(output / "globals.d.luau");
     CHECK(
@@ -177,7 +265,70 @@ TEST_CASE(
     );
     CHECK(module.find("Vector2 = Vector2") != std::string::npos);
     CHECK(read(output / ".luaurc").find("\"entisium\"") != std::string::npos);
+    CHECK(
+        read(output / ".luaurc").find("\"schema\": \"./schema\"") !=
+        std::string::npos
+    );
+    for (const auto& [source, destination] :
+         std::vector<std::pair<std::string, std::string>> {
+             {"libraries/task/task.luau", "task/init.luau"},
+             {"libraries/schema/schema.luau", "schema/init.luau"},
+             {"libraries/context/context.luau", "context/core.luau"},
+             {"runtime/playtest/luau/context.luau", "context/init.luau"},
+             {"runtime/playtest/luau/game.luau", "playtest/game.luau"},
+             {"runtime/playtest/luau/scheduler.luau",
+              "playtest/scheduler.luau"},
+             {"libraries/ai/ai.luau", "ai/init.luau"},
+             {"libraries/http/http.luau", "http/init.luau"},
+             {"libraries/json/json.luau", "json/init.luau"},
+         }) {
+        CHECK(read(output / destination) == read(sources / source));
+    }
     CHECK_FALSE(std::filesystem::exists(output / "modules" / "stale.luau"));
+    CHECK(read(output / ".luaurc").find("\"task\"") != std::string::npos);
+    CHECK(
+        read(output / "globals.d.luau").find("SelectedJsonNull") !=
+        std::string::npos
+    );
+    CHECK(
+        read(output / "json/init.luau").find("SelectedJsonNull") ==
+        std::string::npos
+    );
+    const std::string native_contract =
+        "return nil :: any -- native-only contract\n";
+    write(
+        library_manifest,
+        nlohmann::ordered_json {
+            {"format", "entisium.luau-libraries"},
+            {"version", 1},
+            {"libraries",
+             nlohmann::ordered_json::array(
+                 {{{"name", "@native"},
+                   {"source", ""},
+                   {"native", native_contract},
+                   {"modules", {{"helper.luau", "return {value = 42}"}}}}}
+             )}
+        }.dump()
+    );
+    write(output / "user.luau", "preserved");
+    const auto native_summary = ets::luau_defgen::emit_definitions(
+        database,
+        manual,
+        output,
+        runtime,
+        library_manifest
+    );
+    CHECK(native_summary.class_count == summary.class_count);
+    CHECK(
+        read(output / "globals.d.luau").find("SelectedJsonNull") ==
+        std::string::npos
+    );
+    CHECK(read(output / "native/init.luau") == native_contract);
+    CHECK(read(output / "internal/native.luau") == native_contract);
+    CHECK(read(output / "native/helper.luau") == "return {value = 42}");
+    CHECK_FALSE(std::filesystem::exists(output / "json/init.luau"));
+    CHECK(read(output / "user.luau") == "preserved");
+    CHECK(read(output / ".luaurc").find("\"task\"") == std::string::npos);
 }
 
 TEST_CASE(
@@ -189,6 +340,21 @@ TEST_CASE(
     const auto manual = temporary.path() / "runtime.d.luau";
     const auto output = temporary.path() / "out";
     write(manual, "");
+    const auto sources = temporary.path() / "sources";
+    const auto runtime = sources / "runtime";
+    const auto libraries = sources / "libraries";
+    for (const auto* path :
+         {"libraries/task/task.luau",
+          "libraries/schema/schema.luau",
+          "libraries/context/context.luau",
+          "runtime/playtest/luau/game.luau",
+          "runtime/playtest/luau/scheduler.luau",
+          "runtime/playtest/luau/context.luau",
+          "libraries/ai/ai.luau",
+          "libraries/http/http.luau",
+          "libraries/json/json.luau"}) {
+        write(sources / path, "--!strict\nreturn {}\n");
+    }
     write(
         manifest,
         R"({
@@ -235,10 +401,41 @@ TEST_CASE(
 })"
     );
 
+    nlohmann::ordered_json library_entries = nlohmann::ordered_json::array();
+    for (const auto& [name, file] :
+         std::vector<std::pair<std::string, std::string>> {
+             {"@task", "task/task.luau"},
+             {"@schema", "schema/schema.luau"},
+             {"@context/core", "context/context.luau"},
+             {"@ai", "ai/ai.luau"},
+             {"@http", "http/http.luau"},
+             {"@json", "json/json.luau"}
+         }) {
+        library_entries.push_back(
+            {{"name", name},
+             {"source", read(libraries / file)},
+             {"native", ""},
+             {"dependencies", nlohmann::json::array()}}
+        );
+    }
+    const auto library_manifest = sources / "libraries.json";
+    write(
+        library_manifest,
+        nlohmann::ordered_json {
+            {"format", "entisium.luau-libraries"},
+            {"version", 1},
+            {"libraries", library_entries}
+        }.dump()
+    );
     const std::vector manifests {manifest};
     const auto database = ets::luau_defgen::load_manifests(manifests);
-    const auto summary =
-        ets::luau_defgen::emit_definitions(database, manual, output);
+    const auto summary = ets::luau_defgen::emit_definitions(
+        database,
+        manual,
+        output,
+        runtime,
+        library_manifest
+    );
 
     const auto globals = read(output / "globals.d.luau");
     CHECK(summary.class_count == 3);

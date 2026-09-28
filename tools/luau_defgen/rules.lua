@@ -28,7 +28,7 @@ function generate(target)
         os.projectdir(),
         "tools/luau_defgen/entisium-runtime.d.luau"
     )
-    local arguments = {"--manual", manual, "--output", output}
+    local arguments = {"--manual", manual, "--output", output, "--runtime", path.join(os.projectdir(), "runtime"), "--libraries", assert(target:values("entisium.luau-library.manifest"))}
     for _, manifest in ipairs(manifests) do
         table.insert(arguments, "--manifest")
         table.insert(arguments, manifest)

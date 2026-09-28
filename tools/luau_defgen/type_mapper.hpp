@@ -15,6 +15,7 @@ class TypeMapper {
 
     [[nodiscard]] std::string map(std::string_view cpp_type);
     [[nodiscard]] std::string map_parameter(std::string_view cpp_type);
+    [[nodiscard]] std::string map_library_parameter(std::string_view cpp_type);
     [[nodiscard]] std::string map_dependent_return(
         std::string_view cpp_type,
         std::string_view type_parameter = "T"

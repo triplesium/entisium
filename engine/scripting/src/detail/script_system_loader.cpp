@@ -267,6 +267,14 @@ Status<LuauScriptError> bind_declared_types(
 
 } // namespace
 
+Status<LuauScriptError> prepare_luau_module(
+    LuauRuntime& runtime,
+    LuauScriptModuleId module,
+    const LuauModuleSchema& schema
+) {
+    return prepare_luau_script_system_module(runtime, module, schema, {});
+}
+
 Status<LuauScriptError> prepare_luau_script_system_module(
     LuauRuntime& runtime,
     LuauScriptModuleId module,

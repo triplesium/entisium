@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -138,8 +139,20 @@ void visit_children(CXCursor cursor, Visitor visitor) {
 [[nodiscard]] bool valid_annotation_value(std::string_view value) {
     return !value.empty() && std::ranges::all_of(value, [](unsigned char ch) {
         return std::isalnum(ch) || ch == '_' || ch == ':' || ch == '.' ||
-               ch == '-' || ch == '/';
+               ch == '-' || ch == '/' || ch == '@';
     });
+}
+
+// Skip one ordinary quoted string, keeping punctuation inside it opaque.
+std::size_t quoted_end(std::string_view text, std::size_t begin) {
+    for (std::size_t i = begin + 1; i < text.size(); ++i) {
+        if (text[i] == '\\') {
+            ++i;
+        } else if (text[i] == '"') {
+            return i + 1;
+        }
+    }
+    throw std::runtime_error("Unterminated ETS_REFLECT string literal");
 }
 
 [[nodiscard]] AnnotationArgument
@@ -157,13 +170,6 @@ parse_annotation_argument(std::string_view annotation, std::string_view text) {
             .value = "true",
         };
     }
-    if (text.find('=', separator + 1) != std::string_view::npos) {
-        throw std::runtime_error(
-            "ETS_REFLECT annotation field '" + std::string(text) +
-            "' must use at most one '='"
-        );
-    }
-
     const auto key = trim(text.substr(0, separator));
     if (!valid_annotation_identifier(key)) {
         throw std::runtime_error(
@@ -171,9 +177,29 @@ parse_annotation_argument(std::string_view annotation, std::string_view text) {
         );
     }
     auto value = trim(text.substr(separator + 1));
-    if (!valid_annotation_value(value)) {
+    if (value.starts_with('"')) {
+        std::string decoded;
+        std::size_t position = 0;
+        while (position < value.size()) {
+            if (std::isspace(static_cast<unsigned char>(value[position]))) {
+                ++position;
+                continue;
+            }
+            if (value[position] != '"') {
+                throw std::runtime_error(
+                    "Expected adjacent annotation string literals"
+                );
+            }
+            const auto end = quoted_end(value, position);
+            decoded +=
+                nlohmann::json::parse(value.substr(position, end - position))
+                    .get<std::string>();
+            position = end;
+        }
+        value = std::move(decoded);
+    } else if (!valid_annotation_value(value)) {
         throw std::runtime_error(
-            "Invalid value '" + value + "' for ETS_REFLECT annotation '" +
+            "Invalid value for ETS_REFLECT annotation '" +
             std::string(annotation) + "." + key + "'"
         );
     }
@@ -191,6 +217,10 @@ void for_each_top_level_item(std::string_view text, Callback callback) {
         const bool at_end = index == text.size();
         const char character = at_end ? ',' : text[index];
         if (!at_end) {
+            if (character == '"') {
+                index = quoted_end(text, index) - 1;
+                continue;
+            }
             if (character == '(' || character == '<' || character == '[') {
                 ++nesting;
             } else if (
@@ -321,6 +351,10 @@ parse_reflection_marker(std::string_view source, std::size_t marker_offset) {
     const std::size_t arguments_begin = ++position;
     int depth = 1;
     while (position < source.size() && depth > 0) {
+        if (source[position] == '"') {
+            position = quoted_end(source, position);
+            continue;
+        }
         if (source[position] == '(') {
             ++depth;
         } else if (source[position] == ')') {
@@ -1134,6 +1168,25 @@ parse_enum(CXCursor cursor, const TranslationUnitContext& context) {
         }
 
         const auto member_access = cursor_access(child, current_access);
+        const bool library_method =
+            member_access == "public" &&
+            has_annotation(class_info.annotations, "LuauLibrary") &&
+            std::ranges::none_of(class_info.annotations, [](const auto& mark) {
+                return mark.name == "LuauLibrary" &&
+                       std::ranges::any_of(
+                           mark.arguments,
+                           [](const auto& argument) {
+                               return argument.name == "custom" &&
+                                      argument.value == "true";
+                           }
+                       );
+            });
+        if (library_method && kind == CXCursor_FunctionTemplate) {
+            throw std::runtime_error(
+                "Luau library method templates require an adapter: " +
+                class_name
+            );
+        }
         if (kind == CXCursor_FieldDecl) {
             const auto field_type = clang_getCursorType(child);
             auto property_type = fully_qualified_type(field_type);
@@ -1145,6 +1198,14 @@ parse_enum(CXCursor cursor, const TranslationUnitContext& context) {
                 });
             }
         } else if (kind == CXCursor_CXXMethod) {
+            if (library_method && (clang_Cursor_isVariadic(child) ||
+                                   clang_CXXMethod_isDeleted(child) ||
+                                   !ref_qualifier(child).empty())) {
+                throw std::runtime_error(
+                    "Unsupported Luau library method: " + class_name + "." +
+                    cursor_spelling(child)
+                );
+            }
             if (clang_CXXMethod_isDeleted(child)) {
                 return CXChildVisit_Continue;
             }
@@ -1155,6 +1216,9 @@ parse_enum(CXCursor cursor, const TranslationUnitContext& context) {
             }
 
             MethodInfo method;
+            method.annotations =
+                reflection_annotations_for(child, context)
+                    .value_or(std::vector<ReflectionAnnotation> {});
             method.name = cursor_spelling(child);
             method.type_name =
                 fully_qualified_type(clang_getCursorResultType(child));
@@ -1354,6 +1418,7 @@ parse_enum(CXCursor cursor, const TranslationUnitContext& context) {
     for (unsigned i = 0; i < diagnostic_count; ++i) {
         CXDiagnostic diagnostic = clang_getDiagnostic(translation_unit, i);
         const auto severity = clang_getDiagnosticSeverity(diagnostic);
+        output.has_errors = output.has_errors || severity >= CXDiagnostic_Error;
         if (severity >= CXDiagnostic_Warning) {
             std::cerr << "Warning in " << header << ": "
                       << clang_string(clang_getDiagnosticSpelling(diagnostic))
@@ -1426,6 +1491,7 @@ HeaderParseOutput HeaderParser::parse() {
     HeaderParseOutput output;
     for (const auto& header : m_headers) {
         auto header_result = parse_header(header, m_include_paths, m_verbose);
+        output.has_errors = output.has_errors || header_result.has_errors;
         output.result.annotation_schemas.insert(
             output.result.annotation_schemas.end(),
             std::make_move_iterator(

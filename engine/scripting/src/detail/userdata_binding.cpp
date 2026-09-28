@@ -62,6 +62,15 @@ void push_owned_object(lua_State* state, Ref ref, std::shared_ptr<Val> owner) {
 
 } // namespace
 
+void push_luau_readonly_value(lua_State* state, Val value) {
+    auto owner = std::make_shared<Val>(std::move(value));
+    push_luau_ref(
+        state,
+        std::as_const(*owner).ref(),
+        LuauObjectView {.owner = &owner}
+    );
+}
+
 void push_luau_ref(lua_State* state, Ref ref, const LuauObjectView& parent) {
     if (!ref) {
         lua_pushnil(state);

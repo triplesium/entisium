@@ -203,10 +203,7 @@ TypeMapper::TypeMapper(const Database& database) {
                 m_unqualified_reflected_types.find(unqualified);
             reflected != m_unqualified_reflected_types.end() &&
             reflected->second == cls.name) {
-            m_parameter_coercions.emplace(
-                std::move(unqualified),
-                std::move(coercions)
-            );
+            m_parameter_coercions.emplace(unqualified, std::move(coercions));
         }
     }
 }
@@ -237,6 +234,22 @@ std::string TypeMapper::map(const std::string_view cpp_type) {
             mapped += '?';
         }
         return mapped;
+    }
+    if (const auto generic = parse_template_type(base)) {
+        const auto& args = generic->arguments;
+        if (generic->name == "std::vector" || generic->name == "std::array") {
+            return "ReflectedSequence<" + map(args[0]) + ">";
+        }
+        if ((generic->name == "std::map" ||
+             generic->name == "std::unordered_map") &&
+            args.size() >= 2) {
+            return "ReflectedMap<" + map(args[0]) + ", " + map(args[1]) + ">";
+        }
+        if ((generic->name == "ets::Result" || generic->name == "Result") &&
+            args.size() == 2) {
+            const auto success = args[0] == "void" ? "boolean" : map(args[0]);
+            return "(" + success + "?, " + map(args[1]) + "?)";
+        }
     }
     const bool pointer = original.find('*') != std::string::npos;
     if (pointer) {
@@ -282,6 +295,30 @@ std::string TypeMapper::map_parameter(const std::string_view cpp_type) {
         if (coercion != mapped && coercion != "any") {
             mapped += " | ";
             mapped += coercion;
+        }
+    }
+    return mapped;
+}
+
+std::string TypeMapper::map_library_parameter(const std::string_view cpp_type) {
+    const auto original = trim(std::string {cpp_type});
+    const auto base = normalized_base_type(original);
+    auto mapped = map_parameter(original);
+    if (const auto argument = optional_argument(base)) {
+        auto inner = map_library_parameter(*argument);
+        return inner.find(" | ") == std::string::npos ? inner + '?' :
+                                                        "(" + inner + ")?";
+    }
+    if (const auto generic = parse_template_type(base)) {
+        const auto& args = generic->arguments;
+        if (generic->name == "std::vector" || generic->name == "std::array") {
+            return mapped + " | {" + map_library_parameter(args[0]) + "}";
+        }
+        if ((generic->name == "std::map" ||
+             generic->name == "std::unordered_map") &&
+            args.size() >= 2) {
+            return mapped + " | {[" + map(args[0]) +
+                   "]: " + map_library_parameter(args[1]) + "}";
         }
     }
     return mapped;

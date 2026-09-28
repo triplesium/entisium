@@ -28,11 +28,15 @@ class LuauExecutionPool {
         std::unique_ptr<LuauRuntime> runtime;
     };
 
+    std::shared_ptr<const LuauHostConfig> m_config;
     std::vector<Lane> m_lanes;
     std::size_t m_active_modules {};
 
   public:
-    explicit LuauExecutionPool(std::size_t lane_count = 1);
+    explicit LuauExecutionPool(
+        std::size_t lane_count = 1,
+        std::shared_ptr<const LuauHostConfig> config = {}
+    );
 
     LuauExecutionPool(const LuauExecutionPool&) = delete;
     LuauExecutionPool& operator=(const LuauExecutionPool&) = delete;

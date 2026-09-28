@@ -13,10 +13,16 @@
 struct lua_State;
 
 namespace ets {
+class Method;
 
 struct LuauPropertyPathDecl;
 
 namespace detail {
+int invoke_luau_library(
+    lua_State* state,
+    const Method& method,
+    const std::shared_ptr<Val>& owner
+);
 
 struct LuauMutationContext {
     ComponentTicks* ticks {nullptr};
@@ -53,6 +59,7 @@ Result<Val, std::string> copy_luau_reflected_value(
     std::string_view context
 );
 void push_luau_owned_value(lua_State* state, Val value);
+void push_luau_readonly_value(lua_State* state, Val value);
 void push_luau_type_token(lua_State* state, TypeId type);
 TypeId
 check_luau_type_token(lua_State* state, int index, std::string_view context);

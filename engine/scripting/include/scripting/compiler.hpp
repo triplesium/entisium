@@ -139,6 +139,8 @@ struct LuauCompileOptions {
     // Project scripts default to snapshot-safe behavior. The opt-out exists
     // for low-level VM tests and tooling that never participates in rollback.
     bool snapshot_safe {true};
+    // Tool modules may return a table or entry function instead of exports.
+    bool allow_return {false};
     // Optimization passes are independently selectable for benchmarking and
     // diagnostics. Production compilation keeps every stable pass enabled.
     LuauOptimizationPasses optimization_passes = LuauOptimizationPasses::all();
@@ -196,7 +198,8 @@ extract_luau_script_imports(const LuauScriptSource& source);
 
 Result<LuauModuleMetadata, LuauScriptError> compile_luau_module_metadata(
     const LuauScriptSource& source,
-    bool snapshot_safe = true
+    bool snapshot_safe = true,
+    bool allow_return = false
 );
 
 Result<LuauScriptModuleArtifact, LuauScriptError> compile_luau_script_module(

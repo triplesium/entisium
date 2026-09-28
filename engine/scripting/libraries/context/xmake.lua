@@ -1,0 +1,5 @@
+target("entisium-luau-context-core")
+    set_kind("static")
+    add_rules("entisium.luau_library")
+    add_files("context.luau")
+    set_values("luau.name", "@context/core")

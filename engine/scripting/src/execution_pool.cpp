@@ -100,8 +100,10 @@ current_lane(const LuauExecutionPool& pool, const LuauExecutionModule& module) {
 
 } // namespace
 
-LuauExecutionPool::LuauExecutionPool(std::size_t lane_count) :
-    m_lanes(lane_count) {
+LuauExecutionPool::LuauExecutionPool(
+    std::size_t lane_count,
+    std::shared_ptr<const LuauHostConfig> config
+) : m_config(std::move(config)), m_lanes(lane_count) {
     if (lane_count == 0) {
         throw std::invalid_argument(
             "Luau execution pool requires at least one lane"
@@ -146,7 +148,7 @@ LuauExecutionPool::runtime(std::size_t lane_index) {
     }
     auto& lane = m_lanes[lane_index];
     if (!lane.runtime) {
-        lane.runtime = std::make_unique<LuauRuntime>();
+        lane.runtime = std::make_unique<LuauRuntime>(m_config);
     }
     return *lane.runtime;
 }

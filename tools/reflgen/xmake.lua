@@ -76,7 +76,7 @@ target("entisium-reflgen")
             set_toolchains("gcc")
         end
     end
-    add_files("*.cpp")
+    add_files("*.cpp", "../luau_defgen/type_mapper.cpp", "../luau_defgen/model.cpp")
     add_headerfiles("*.hpp")
     add_packages("llvm-libclang", "cli11", "nlohmann_json")
 
@@ -84,9 +84,9 @@ target("entisium-reflgen-tests")
     set_kind("binary")
     set_default(false)
     add_rules("entisium.test")
-    add_files("manifest.cpp", "metadata.cpp", "model.cpp", "tests/*.cpp")
+    add_files("manifest.cpp", "metadata.cpp", "model.cpp", "parser.cpp", "library_codegen.cpp", "codegen.cpp", "../luau_defgen/type_mapper.cpp", "../luau_defgen/model.cpp", "tests/*.cpp")
     add_includedirs(".")
-    add_packages("nlohmann_json")
+    add_packages("nlohmann_json", "llvm-libclang")
 
 rule("entisium.reflect.file")
     set_extensions(".reflgen")

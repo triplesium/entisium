@@ -1,0 +1,6 @@
+target("entisium-luau-task")
+    set_kind("static")
+    add_rules("entisium.luau_library")
+    add_files("*.cpp")
+    add_headerfiles("*.hpp")
+    add_files("task.luau")

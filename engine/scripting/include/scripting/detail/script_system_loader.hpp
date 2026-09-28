@@ -17,6 +17,12 @@ class World;
 
 namespace detail {
 
+Status<LuauScriptError> prepare_luau_module(
+    LuauRuntime& runtime,
+    LuauScriptModuleId module,
+    const LuauModuleSchema& schema
+);
+
 Status<LuauScriptError> prepare_luau_script_system_module(
     LuauRuntime& runtime,
     LuauScriptModuleId module,

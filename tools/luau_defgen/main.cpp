@@ -11,6 +11,8 @@ int main(int argc, char** argv) {
     std::vector<std::filesystem::path> manifests;
     std::filesystem::path manual_definitions;
     std::filesystem::path output_directory;
+    std::filesystem::path runtime_directory;
+    std::filesystem::path libraries_directory;
 
     CLI::App app {
         "Generate Luau definitions from Entisium reflection manifests"
@@ -30,6 +32,14 @@ int main(int argc, char** argv) {
            "Generated definition directory"
     )
         ->required();
+    app.add_option("--runtime", runtime_directory, "Runtime source directory")
+        ->required();
+    app.add_option(
+           "--libraries",
+           libraries_directory,
+           "Generated Luau library manifest"
+    )
+        ->required();
     CLI11_PARSE(app, argc, argv);
 
     try {
@@ -37,7 +47,9 @@ int main(int argc, char** argv) {
         const auto summary = ets::luau_defgen::emit_definitions(
             database,
             manual_definitions,
-            output_directory
+            output_directory,
+            runtime_directory,
+            libraries_directory
         );
         std::cout << "Generated Luau definitions for " << summary.class_count
                   << " classes, " << summary.enum_count << " enums and "

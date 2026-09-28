@@ -36,6 +36,7 @@ struct AnnotationSchemaInfo {
 };
 
 struct MethodInfo : MemberInfo {
+    std::vector<ReflectionAnnotation> annotations;
     std::vector<ParamInfo> parameters;
     std::optional<std::string> dependent_return_parameter;
     bool is_static = false;

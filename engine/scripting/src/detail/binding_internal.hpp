@@ -4,7 +4,9 @@
 #include "refl/registry.hpp"
 #include "scripting/detail/binding.hpp"
 
+#include <cmath>
 #include <lua.h>
+#include <lualib.h>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -46,6 +48,10 @@ struct LuauObjectView {
     const std::shared_ptr<Val>* owner {nullptr};
 };
 
+bool push_luau_container_index(lua_State*, const LuauObjectView&);
+bool push_luau_container_iterator(lua_State*, const LuauObjectView&);
+int luau_container_length(lua_State*);
+
 struct LuauTypeToken {
     TypeId type;
 };
@@ -71,15 +77,26 @@ inline bool push_luau_primitive(lua_State* state, Ref ref) {
     } else if (id == type_id<std::string>()) {
         const auto& value = ref.get_const<std::string>();
         lua_pushlstring(state, value.data(), value.size());
+    } else if (id == type_id<std::string_view>()) {
+        const auto value = ref.get_const<std::string_view>();
+        lua_pushlstring(state, value.data(), value.size());
     } else {
         auto type = Registry::instance().try_get_type(id);
         if (!type) {
             return false;
         }
         if (type->is_integral()) {
-            lua_pushinteger(state, ref.to_number<lua_Integer>());
+            const auto value = ref.to_number<long double>();
+            if (value < -9007199254740991.0L || value > 9007199254740991.0L) {
+                luaL_error(state, "Integer outside exact Luau range");
+            }
+            lua_pushnumber(state, static_cast<double>(value));
         } else if (type->is_floating_point()) {
-            lua_pushnumber(state, ref.to_number<double>());
+            const auto value = ref.to_number<double>();
+            if (!std::isfinite(value)) {
+                luaL_error(state, "Non-finite result");
+            }
+            lua_pushnumber(state, value);
         } else {
             return false;
         }

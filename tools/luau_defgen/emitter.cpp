@@ -348,7 +348,9 @@ void append_module_export(
 EmissionSummary emit_definitions(
     const Database& database,
     const std::filesystem::path& manual_definitions,
-    const std::filesystem::path& output_directory
+    const std::filesystem::path& output_directory,
+    const std::filesystem::path& runtime_directory,
+    const std::filesystem::path& libraries_directory
 ) {
     TypeMapper mapper {database};
     std::ostringstream globals;
@@ -423,10 +425,112 @@ EmissionSummary emit_definitions(
         write_if_changed(modules_directory / (module + ".luau"), source.str());
     }
 
+    const auto playtest_directory = output_directory / "playtest";
+    std::filesystem::create_directories(playtest_directory);
+    write_if_changed(
+        playtest_directory / "game.luau",
+        read_file(runtime_directory / "playtest/luau/game.luau")
+    );
+    write_if_changed(
+        playtest_directory / "scheduler.luau",
+        read_file(runtime_directory / "playtest/luau/scheduler.luau")
+    );
+    std::filesystem::remove(playtest_directory / "test.luau");
+    const auto library_manifest = Json::parse(read_file(libraries_directory));
+    if (library_manifest.at("format") != "entisium.luau-libraries" ||
+        library_manifest.at("version") != 1) {
+        throw std::runtime_error("Unsupported Luau library manifest");
+    }
+    Json aliases {
+        {"entisium", "./modules"},
+        {"playtest", "./playtest"},
+        {"context", "./context"},
+        {"internal", "./internal"}
+    };
+    Json outputs = Json::array();
+    const auto publish = [&](const std::string& name,
+                             const std::string& content) {
+        if (name.empty() || name.front() != '@' ||
+            name.find("..") != std::string::npos ||
+            name.find('\\') != std::string::npos ||
+            name.find(':') != std::string::npos) {
+            throw std::runtime_error("Invalid SDK module name: " + name);
+        }
+        const auto plain = name.substr(1);
+        const auto slash = plain.find('/');
+        const auto alias = plain.substr(0, slash);
+        const auto relative =
+            plain + (slash == std::string::npos ? "/init.luau" : ".luau");
+        if (std::find(outputs.begin(), outputs.end(), relative) !=
+            outputs.end()) {
+            throw std::runtime_error(
+                "Conflicting SDK library file: " + relative
+            );
+        }
+        aliases[alias] = "./" + alias;
+        write_if_changed(output_directory / relative, content);
+        outputs.push_back(relative);
+    };
+    for (const auto& library : library_manifest.at("libraries")) {
+        const auto library_globals = library.value("globals", std::string {});
+        if (!library_globals.empty()) {
+            globals << "\n-- Native declarations from "
+                    << library.at("name").get<std::string>() << "\n"
+                    << library_globals << "\n";
+        }
+        const auto name = library.at("name").get<std::string>();
+        const auto source = library.at("source").get<std::string>();
+        const auto native = library.at("native").get<std::string>();
+        if (!source.empty()) {
+            publish(name, source);
+        } else {
+            publish(name, native);
+        }
+        if (!native.empty()) {
+            publish("@internal/" + name.substr(1), native);
+        }
+        const auto parent = name.find_last_of('/');
+        const auto prefix =
+            parent == std::string::npos ? name : name.substr(0, parent);
+        const auto source_modules = library.value("modules", Json::object());
+        for (const auto& [file, content] : source_modules.items()) {
+            if (!file.ends_with(".luau") || file.ends_with(".d.luau")) {
+                throw std::runtime_error(
+                    "Invalid library source file: " + file
+                );
+            }
+            publish(
+                prefix + "/" + file.substr(0, file.size() - 5),
+                content.get<std::string>()
+            );
+        }
+    }
     write_if_changed(output_directory / "globals.d.luau", globals.str());
+    publish(
+        "@context/init",
+        read_file(runtime_directory / "playtest/luau/context.luau")
+    );
+    const auto owned = output_directory / "library-files.json";
+    if (std::filesystem::exists(owned)) {
+        for (const auto& previous : Json::parse(read_file(owned))) {
+            const auto relative = previous.get<std::string>();
+            const auto path = std::filesystem::path(relative);
+            if (path.is_absolute() ||
+                relative.find("..") != std::string::npos ||
+                relative.find(':') != std::string::npos ||
+                relative.find('\\') != std::string::npos) {
+                throw std::runtime_error("Invalid SDK cleanup path");
+            }
+            if (std::find(outputs.begin(), outputs.end(), previous) ==
+                outputs.end()) {
+                std::filesystem::remove(output_directory / path);
+            }
+        }
+    }
+    write_if_changed(owned, outputs.dump(2) + '\n');
     write_if_changed(
         output_directory / ".luaurc",
-        "{\n  \"aliases\": {\n    \"entisium\": \"./modules\"\n  }\n}\n"
+        Json {{"aliases", aliases}}.dump(2) + '\n'
     );
     const Json index {
         {"format", "entisium.luau-definitions"},

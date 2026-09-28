@@ -19,7 +19,9 @@ struct EmissionSummary {
 [[nodiscard]] EmissionSummary emit_definitions(
     const Database& database,
     const std::filesystem::path& manual_definitions,
-    const std::filesystem::path& output_directory
+    const std::filesystem::path& output_directory,
+    const std::filesystem::path& runtime_directory,
+    const std::filesystem::path& libraries_directory
 );
 
 } // namespace ets::luau_defgen

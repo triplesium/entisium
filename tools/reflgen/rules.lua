@@ -781,7 +781,7 @@ function configure_target(target)
     target:set("values", "entisium.reflect.module_file", path.join(autogendir, "reflection.cpp"))
     target:set("values", "entisium.reflect.module_function", target_symbol_name(target:name()))
     target:set("values", "entisium.reflect.module_marker_file", path.join(autogendir, "module.reflmod"))
-    target:set("values", "entisium.reflect.script_module", script_module_name(target:name()))
+    target:set("values", "entisium.reflect.script_module", target:values("entisium.reflect.script_module") or script_module_name(target:name()))
     target:add("deps", "entisium-reflgen", {links = false})
     if target:name() ~= "entisium-refl" then
         target:add("deps", "entisium-refl")

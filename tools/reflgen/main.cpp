@@ -1,4 +1,5 @@
 #include "codegen.hpp"
+#include "library_codegen.hpp"
 #include "manifest.hpp"
 #include "metadata.hpp"
 #include "model.hpp"
@@ -26,6 +27,8 @@ struct Options {
     std::filesystem::path output_file;
     std::filesystem::path manifest_output;
     std::filesystem::path metadata_output;
+    std::filesystem::path libraries;
+    bool library_part = false;
     std::filesystem::path stamp_file;
     std::filesystem::path depfile;
     std::string dep_target;
@@ -43,6 +46,17 @@ struct Options {
 
 void configure_options(CLI::App& app, Options& options) {
     app.add_option("headers", options.headers, "Header files to parse");
+    app.add_flag(
+        "--library-part",
+        options.library_part,
+        "Generate one target's library; dependencies are validated by the host "
+        "catalog"
+    );
+    app.add_option(
+        "--libraries",
+        options.libraries,
+        "Luau library build catalog"
+    );
     auto* include_option = app.add_option_function<std::string>(
         "-I,--include",
         [&options](const std::string& include) {
@@ -127,7 +141,8 @@ void normalize_options(Options& options) {
         }
         return;
     }
-    if (options.headers.empty() && !options.aggregate) {
+    if (options.headers.empty() && !options.aggregate &&
+        options.libraries.empty()) {
         throw std::runtime_error("no headers provided");
     }
     if (options.aggregate && options.output_file.empty()) {
@@ -298,6 +313,20 @@ int main(int argc, char** argv) {
             write_stamp_file(options.stamp_file);
             std::cout << "Generated C++ reflection aggregate: "
                       << options.output_file.generic_string() << '\n';
+            return 0;
+        }
+
+        if (!options.libraries.empty()) {
+            ets::reflgen::generate_luau_libraries(
+                options.libraries,
+                options.output_file,
+                options.manifest_output,
+                options.includes,
+                options.function_name == "register_reflection" ?
+                    "default_luau_libraries" :
+                    options.function_name,
+                options.library_part
+            );
             return 0;
         }
 

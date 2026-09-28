@@ -17,8 +17,10 @@ void update_dynamic_events(ResRW<DynamicEvents> events) {
 } // namespace
 
 void LuauScriptingPlugin::setup(App& app) {
-    app.add_resource(LuauRuntime {})
-        .add_resource(LuauExecutionPool {app.world().worker_threads() + 1})
+    app.add_resource(LuauRuntime {m_config})
+        .add_resource(
+            LuauExecutionPool {app.world().worker_threads() + 1, m_config}
+        )
         .add_resource(LuauScriptSystemRegistry {})
         .add_resource(LuauSnapshotState {})
         .add_resource(DynamicEvents {})

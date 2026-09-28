@@ -1,6 +1,5 @@
 #include "scripting/compiler.hpp"
 
-#include "app/app.hpp"
 #include "asset/handle.hpp"
 #include "compiler/compilation_session.hpp"
 #include "compiler/module_ir.hpp"
@@ -8,8 +7,10 @@
 #include "ecs/dynamic/system_decl.hpp"
 #include "refl/annotations.hpp"
 #include "refl/cls.hpp"
+#include "refl/generated.hpp"
 #include "refl/registry.hpp"
 #include "scripting/detail/plugin_install.hpp"
+#include "scripting/library.hpp"
 #include "scripting/runtime.hpp"
 
 #include <algorithm>
@@ -654,6 +655,38 @@ TEST_CASE(
 }
 
 TEST_CASE(
+    "Luau type qualification recognizes catalog libraries without a name list",
+    "[scripting_luau][compiler][type][import]"
+) {
+    for (const auto* specifier :
+         {"@fixture", "@internal/fixture", "@context/bridge"}) {
+        INFO(specifier);
+        REQUIRE(is_luau_library(specifier));
+        auto metadata = compile_luau_module_metadata({
+            .name = "project://scripts/catalog_types.luau",
+            .content =
+                std::string("local Library = require(\"") + specifier + R"(")
+                local Player = require("./player")
+                export type Selection = {
+                    library: Library.Payload,
+                    player: Player.Player,
+                }
+            )",
+        });
+        if (!metadata) {
+            FAIL(metadata.error().message);
+        }
+        REQUIRE(metadata->schema.types.size() == 1);
+        const auto& fields = metadata->schema.types.front().fields;
+        REQUIRE(fields.size() == 2);
+        CHECK(fields[0].type.type_name == "Library::Payload");
+        CHECK_FALSE(fields[0].type.script_type);
+        CHECK(fields[1].type.type_name == "project.scripts.player.Player");
+        CHECK(fields[1].type.script_type);
+    }
+}
+
+TEST_CASE(
     "Luau compiler adds multiple systems from exported Plugins",
     "[scripting_luau][compiler][plugin][system]"
 ) {
@@ -1066,6 +1099,7 @@ TEST_CASE(
     "Luau native playtest types do not require script module metadata",
     "[scripting_luau][compiler][plugin][playtest][native]"
 ) {
+    register_generated_reflection();
     auto& registry = Registry::instance();
     registry
         .register_cls<NativePlaytestComponent>(

@@ -3,13 +3,13 @@
 #include "refl/annotations.hpp"
 #include "refl/registry.hpp"
 #include "scripting/detail/reflection_bridge.hpp"
+#include "scripting/library.hpp"
 #include "source_name.hpp"
 
 #include <algorithm>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 
 namespace ets::detail::luau_compiler {
@@ -136,8 +136,11 @@ ImportedTypeBindings imported_type_bindings(
                                         source.name.substr(delimiter + 3);
     ImportedTypeBindings result;
     for (const auto& [local_name, specifier] : collect_imports(root)) {
-        if (is_native_luau_module(specifier)) {
-            constexpr std::string_view native_prefix = "@entisium/";
+        if (is_luau_library(specifier)) {
+            continue;
+        }
+        constexpr std::string_view native_prefix = "@entisium/";
+        if (specifier.starts_with(native_prefix)) {
             const std::string_view module_name =
                 std::string_view {specifier}.substr(native_prefix.size());
             for (const TypeId id :

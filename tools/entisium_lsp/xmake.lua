@@ -26,6 +26,11 @@ if has_config("tests") then
         )
         add_includedirs("src", "../../engine/scripting/include")
         add_packages("luau-lsp")
+        add_deps("entisium-scripting")
+        after_load(function(target)
+            local catalog = path.absolute(path.join(target:autogendir(), "luau-catalog", "libraries.json")):gsub("\\", "/")
+            target:add("defines", 'ETS_TEST_LUAU_CATALOG="' .. catalog .. '"')
+        end)
         add_defines(
             "ETS_PROJECT_ROOT=\"" .. os.projectdir():gsub("\\", "/") .. "\""
         )

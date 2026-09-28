@@ -4,6 +4,7 @@
 #include "base/types.hpp"
 #include "scripting/compiler.hpp"
 #include "scripting/error.hpp"
+#include "scripting/host_config.hpp"
 #include "scripting/source.hpp"
 
 #include <cstdint>
@@ -77,13 +78,24 @@ class LuauRuntime {
     std::unique_ptr<Impl> m_impl;
 
   public:
-    LuauRuntime();
+    explicit LuauRuntime(std::shared_ptr<const LuauHostConfig> config = {});
+    std::string
+    library_diagnostic(std::string_view name, std::string_view key) const;
     ~LuauRuntime();
 
     LuauRuntime(const LuauRuntime&) = delete;
     LuauRuntime& operator=(const LuauRuntime&) = delete;
     LuauRuntime(LuauRuntime&&) noexcept;
     LuauRuntime& operator=(LuauRuntime&&) noexcept;
+
+    // Tool execution is opt-in; game VM behavior is unchanged.
+    void enable_host_calls(uint32 interrupt_budget = 100'000);
+    Status<LuauScriptError>
+    start_task(LuauScriptModuleId module, std::string_view entry = "run");
+    // Returns {kind:"request", method, payload} or {kind:"completed"}.
+    // Replies are {ok:true,value:...} or {ok:false,error:"..."}.
+    Result<std::string, LuauScriptError>
+    resume_task(std::string_view reply_json = {});
 
     Result<LuauScriptModuleId, LuauScriptError> load_module(
         const LuauScriptModuleArtifact& artifact,

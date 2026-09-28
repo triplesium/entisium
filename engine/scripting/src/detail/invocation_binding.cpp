@@ -1,9 +1,11 @@
 #include "binding_internal.hpp"
+#include "library_scalar.hpp"
 #include "refl/callable.hpp"
 #include "refl/cls.hpp"
 #include "refl/container_adapter.hpp"
 #include "refl/enum.hpp"
 #include "refl/registry.hpp"
+#include "scripting/detail/json_value.hpp"
 #include "scripting/detail/reflection_bridge.hpp"
 
 #include <cmath>
@@ -13,6 +15,7 @@
 #include <lua.h>
 #include <lualib.h>
 #include <memory>
+#include <nlohmann/json.hpp> // IWYU pragma: keep
 #include <string>
 #include <string_view>
 #include <utility>
@@ -98,6 +101,10 @@ Result<Val, std::string> argument_value(lua_State* state, int index) {
 void push_owned_value(lua_State* state, Val value) {
     if (!value) {
         lua_pushnil(state);
+        return;
+    }
+    if (value.type_id() == type_id<nlohmann::json>()) {
+        push_json(state, value.get<nlohmann::json>());
         return;
     }
     if (push_luau_primitive(state, value.ref())) {
@@ -250,38 +257,9 @@ int invoke_static_method(lua_State* state) {
 int construct_type(lua_State* state, TypeId type, int first_argument) {
     const int argument_count = lua_gettop(state) - first_argument + 1;
     if (argument_count == 1 && lua_istable(state, first_argument)) {
-        auto value = luau_default_construct(type);
+        auto value = luau_value_for_type(state, first_argument, type);
         if (!value) {
-            return raise_message(state, value.error().message);
-        }
-        auto cls = Registry::instance().try_get_cls(type);
-        if (!cls) {
-            return raise_message(state, cls.error().message);
-        }
-        lua_pushnil(state);
-        while (lua_next(state, first_argument) != 0) {
-            if (lua_type(state, -2) != LUA_TSTRING) {
-                return raise_message(
-                    state,
-                    "reflected initializer keys must be strings"
-                );
-            }
-            const char* name = lua_tostring(state, -2);
-            auto property = cls->try_get_property(name);
-            if (!property) {
-                return raise_message(state, property.error().message);
-            }
-            auto assigned_value =
-                luau_value_for_property(state, -1, property->type_id());
-            if (!assigned_value) {
-                return raise_message(state, assigned_value.error());
-            }
-            auto assigned =
-                luau_set_property(value->ref(), name, assigned_value->ref());
-            if (!assigned) {
-                return raise_message(state, assigned.error().message);
-            }
-            lua_pop(state, 1);
+            return raise_message(state, value.error());
         }
         push_owned_value(state, std::move(*value));
         return 1;
@@ -331,6 +309,81 @@ int type_new(lua_State* state) {
 
 } // namespace
 
+int invoke_luau_library(
+    lua_State* state,
+    const Method& method,
+    const std::shared_ptr<Val>& owner
+) {
+    try {
+        const auto& params = method.params();
+        if (lua_gettop(state) > static_cast<int>(params.size())) {
+            throw std::invalid_argument("Too many arguments");
+        }
+        std::vector<Val> values;
+        std::vector<Ref> args;
+        std::vector<MutationSnapshot> mutations;
+        values.reserve(params.size());
+        args.reserve(params.size() + 1);
+        if (!method.is_static()) {
+            if (!owner) {
+                throw std::invalid_argument(
+                    "Library instance requires a default or services "
+                    "constructor"
+                );
+            }
+            args.push_back(owner->ref());
+        }
+        for (std::size_t i = 0; i < params.size(); ++i) {
+            const int index = static_cast<int>(i + 1);
+            const auto expected = params[i].type_id();
+            const auto container =
+                Registry::instance().try_get_container_adapter(expected);
+            if ((!container || container->kind() != ContainerKind::Optional) &&
+                lua_isuserdata(state, index) && expected != type_id<TypeId>() &&
+                expected != type_id<Ref>() && expected != type_id<Val>() &&
+                expected != type_id<nlohmann::json>()) {
+                auto object = check_luau_object(state, index);
+                args.push_back(object.ref);
+                capture_mutation_snapshot(object, mutations);
+                continue;
+            }
+            const auto qualification = params[i].type();
+            if ((qualification.is_reference() && !qualification.is_const()) ||
+                qualification.is_rvalue_reference()) {
+                throw std::invalid_argument(
+                    "Mutable references require a reflected object argument"
+                );
+            }
+            auto value = luau_value_for_type(state, index, expected);
+            if (!value) {
+                throw std::invalid_argument(
+                    "argument " + std::to_string(index) + ": " + value.error()
+                );
+            }
+            values.push_back(std::move(*value));
+            args.push_back(values.back().ref());
+        }
+        auto result = method.invoke_variadic(args);
+        apply_mutation_snapshots(mutations);
+        if (result && result->is_one() && result->item().is_value() &&
+            method.return_type().is_const()) {
+            push_luau_readonly_value(state, std::move(result->item().value()));
+            return 1;
+        }
+        return push_invoke_result(
+            state,
+            std::move(result),
+            LuauObjectView {
+                .ref = owner ? owner->ref() : Ref {},
+                .owner = owner ? &owner : nullptr
+            }
+        );
+    } catch (const std::exception& error) {
+        lua_pushstring(state, error.what());
+    }
+    lua_error(state);
+}
+
 int luau_type_token_call(lua_State* state) {
     const TypeId type =
         check_luau_type_token(state, 1, "reflected constructor");
@@ -352,6 +405,58 @@ luau_value_for_property(lua_State* state, int index, TypeId expected) {
 
 Result<Val, std::string>
 luau_value_for_type(lua_State* state, int index, TypeId expected) {
+    if (expected == type_id<nlohmann::json>()) {
+        try {
+            std::size_t nodes = 0;
+            return make_val<nlohmann::json>(
+                luau_json(state, index, "value", 0, nodes, true)
+            );
+        } catch (const std::exception& error) {
+            return failure(std::string(error.what()));
+        }
+    }
+    if (expected == type_id<Ref>()) {
+        if (!lua_isuserdata(state, index)) {
+            return failure(std::string("Expected a reflected object"));
+        }
+        return make_val<Ref>(check_luau_object(state, index).ref);
+    }
+    if (expected == type_id<Val>()) {
+        auto value = copy_luau_reflected_value(state, index, "value");
+        if (!value) {
+            return failure(value.error());
+        }
+        return make_val<Val>(std::move(*value));
+    }
+#define ETS_LUAU_SCALAR(T)                                              \
+    if (expected == type_id<T>()) {                                     \
+        try {                                                           \
+            return make_val<T>(LuauScalarCodec<T>::read(state, index)); \
+        } catch (const std::exception& error) {                         \
+            return failure(std::string(error.what()));                  \
+        }                                                               \
+    }
+    ETS_LUAU_SCALAR(bool)
+    ETS_LUAU_SCALAR(char)
+    ETS_LUAU_SCALAR(char8_t)
+    ETS_LUAU_SCALAR(char16_t)
+    ETS_LUAU_SCALAR(char32_t)
+    ETS_LUAU_SCALAR(signed char)
+    ETS_LUAU_SCALAR(unsigned char)
+    ETS_LUAU_SCALAR(short)
+    ETS_LUAU_SCALAR(unsigned short)
+    ETS_LUAU_SCALAR(int)
+    ETS_LUAU_SCALAR(unsigned int)
+    ETS_LUAU_SCALAR(long)
+    ETS_LUAU_SCALAR(unsigned long)
+    ETS_LUAU_SCALAR(long long)
+    ETS_LUAU_SCALAR(unsigned long long)
+    ETS_LUAU_SCALAR(float)
+    ETS_LUAU_SCALAR(double)
+    ETS_LUAU_SCALAR(long double)
+    ETS_LUAU_SCALAR(std::string)
+    ETS_LUAU_SCALAR(std::string_view)
+#undef ETS_LUAU_SCALAR
     auto adapter = Registry::instance().try_get_container_adapter(expected);
     if (adapter && adapter->kind() == ContainerKind::Optional) {
         auto type = Registry::instance().try_get_type(expected);
@@ -359,7 +464,7 @@ luau_value_for_type(lua_State* state, int index, TypeId expected) {
             return failure(type.error().message);
         }
         Val optional = Val::default_construct(*type);
-        if (lua_isnil(state, index)) {
+        if (lua_isnoneornil(state, index)) {
             return optional;
         }
         auto* indexed = adapter->indexed();
@@ -380,30 +485,153 @@ luau_value_for_type(lua_State* state, int index, TypeId expected) {
         }
         return optional;
     }
+    if (lua_istable(state, index)) {
+        struct ConversionScope {
+            lua_State* state;
+            int top;
+            unsigned& depth;
+            ~ConversionScope() {
+                lua_settop(state, top);
+                --depth;
+            }
+        };
+        static thread_local unsigned depth = 0;
+        if (depth >= 64 || !lua_checkstack(state, 8)) {
+            return failure(std::string("Table conversion depth exceeded"));
+        }
+        ++depth;
+        ConversionScope scope {state, lua_gettop(state), depth};
+        index = lua_absindex(state, index);
+        if (lua_getmetatable(state, index)) {
+            return failure(std::string("Expected a plain table"));
+        }
+        auto type = Registry::instance().try_get_type(expected);
+        if (!type || !type->default_constructible()) {
+            return failure(
+                std::string("Type cannot be initialized from a table")
+            );
+        }
+        Val value = Val::default_construct(*type);
+        if (adapter) {
+            if (auto* indexed = adapter->indexed()) {
+                const auto count =
+                    static_cast<std::size_t>(lua_objlen(state, index));
+                if (count > 100000) {
+                    return failure(std::string("Array is too large"));
+                }
+                std::size_t keys = 0;
+                lua_pushnil(state);
+                while (lua_next(state, index)) {
+                    const double key = lua_type(state, -2) == LUA_TNUMBER ?
+                                           lua_tonumber(state, -2) :
+                                           0;
+                    if (key < 1 || key > static_cast<double>(count) ||
+                        std::floor(key) != key) {
+                        return failure(std::string("Expected a dense array"));
+                    }
+                    ++keys;
+                    lua_pop(state, 1);
+                }
+                if (keys != count) {
+                    return failure(std::string("Expected a dense array"));
+                }
+                if (indexed->fixed_size()) {
+                    auto size = indexed->size(value.ref());
+                    if (!size || *size != count) {
+                        return failure(std::string("Wrong fixed array size"));
+                    }
+                }
+                for (std::size_t i = 0; i < count; ++i) {
+                    auto element_type = indexed->element_type(value.ref(), i);
+                    if (!element_type) {
+                        return failure(element_type.error().message);
+                    }
+                    lua_rawgeti(state, index, static_cast<int>(i + 1));
+                    auto element =
+                        luau_value_for_type(state, -1, *element_type);
+                    if (!element) {
+                        return failure(
+                            "[" + std::to_string(i + 1) +
+                            "]: " + element.error()
+                        );
+                    }
+                    auto assigned =
+                        indexed->fixed_size() ?
+                            indexed->assign(value.ref(), i, element->ref()) :
+                            indexed->append(value.ref(), element->ref());
+                    if (!assigned) {
+                        return failure(assigned.error().message);
+                    }
+                    lua_pop(state, 1);
+                }
+                return value;
+            }
+            if (auto* associative = adapter->associative();
+                associative && associative->has_mapped_value()) {
+                lua_pushnil(state);
+                std::size_t count = 0;
+                while (lua_next(state, index)) {
+                    if (++count > 100000) {
+                        return failure(std::string("Map is too large"));
+                    }
+                    auto key =
+                        luau_value_for_type(state, -2, associative->key_type());
+                    auto element = luau_value_for_type(
+                        state,
+                        -1,
+                        associative->mapped_type()
+                    );
+                    if (!key) {
+                        return failure(key.error());
+                    }
+                    if (!element) {
+                        return failure(element.error());
+                    }
+                    auto inserted = associative->insert(
+                        value.ref(),
+                        {key->ref(), element->ref()}
+                    );
+                    if (!inserted) {
+                        return failure(inserted.error().message);
+                    }
+                    lua_pop(state, 1);
+                }
+                return value;
+            }
+            return failure(
+                std::string("Unsupported table container conversion")
+            );
+        }
+        auto cls = Registry::instance().try_get_cls(expected);
+        if (!cls) {
+            return failure(cls.error().message);
+        }
+        lua_pushnil(state);
+        while (lua_next(state, index)) {
+            if (lua_type(state, -2) != LUA_TSTRING) {
+                return failure(std::string("Field names must be strings"));
+            }
+            const std::string name = lua_tostring(state, -2);
+            auto property = cls->try_get_property(name);
+            if (!property) {
+                return failure(property.error().message);
+            }
+            auto field = luau_value_for_type(state, -1, property->type_id());
+            if (!field) {
+                return failure(name + ": " + field.error());
+            }
+            auto assigned = luau_set_property(value.ref(), name, field->ref());
+            if (!assigned) {
+                return failure(assigned.error().message);
+            }
+            lua_pop(state, 1);
+        }
+        return value;
+    }
     if (expected == type_id<Entity>() && lua_isnumber(state, index)) {
         return make_val<Entity>(Entity {
             static_cast<std::uint32_t>(lua_tounsigned(state, index)),
         });
-    }
-    if (expected == type_id<bool>() && lua_isboolean(state, index)) {
-        return make_val<bool>(lua_toboolean(state, index) != 0);
-    }
-    if (expected == type_id<int>() && lua_isnumber(state, index)) {
-        return make_val<int>(static_cast<int>(lua_tointeger(state, index)));
-    }
-    if (expected == type_id<unsigned int>() && lua_isnumber(state, index)) {
-        return make_val<unsigned int>(lua_tounsigned(state, index));
-    }
-    if (expected == type_id<float>() && lua_isnumber(state, index)) {
-        return make_val<float>(static_cast<float>(lua_tonumber(state, index)));
-    }
-    if (expected == type_id<double>() && lua_isnumber(state, index)) {
-        return make_val<double>(lua_tonumber(state, index));
-    }
-    if (expected == type_id<std::string>() && lua_isstring(state, index)) {
-        std::size_t size = 0;
-        const char* text = lua_tolstring(state, index, &size);
-        return make_val<std::string>(text, size);
     }
     if (expected == type_id<TypeId>() && is_luau_type_token(state, index)) {
         return make_val<TypeId>(
