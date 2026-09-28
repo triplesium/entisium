@@ -26,6 +26,13 @@ Entisium includes an agent-assisted editor with structured playtesting, runtime 
 
 ![Entisium Editor running an agent-driven Skyline Strike playtest](docs/images/editor-agent-playtest.png)
 
+## Scripting
+
+The [Scripting guide](scripting/README.md) is the entrypoint for Luau libraries,
+API documentation, runnable examples and Playtest scripts. Script-facing libraries
+and their native adapters live in `scripting/`; the VM, compiler and ECS integration
+live in `engine/scripting/`.
+
 ## Requirements
 
 - A C++23-capable compiler

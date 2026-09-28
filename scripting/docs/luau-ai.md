@@ -1,7 +1,7 @@
 # Luau AI and host configuration
 
 `@ai`, `@schema`, `@json`, `@http` and `@task` are built-in modules shared by game
-and Playtest VMs. Public AI types and protocols live in `engine/scripting/libraries/ai/ai.luau`.
+and Playtest VMs. Public AI types and protocols live in `scripting/libraries/ai/ai.luau`.
 Importing modules does not register services or require configured providers.
 
 ## Configuration
@@ -81,8 +81,8 @@ local result = planner:generate {
 
 `result.data` is validated and typed; `result.model` and `result.usage` retain metadata.
 `ai.decision` retains the choice, score and noul APIs in the
-[Jev guide](../runtime/playtest/DECISIONS.md). Ordinary generation supports complete
-Responses and Chat Completions responses; see [generation semantics](../runtime/playtest/LLM.md).
+[Jev guide](playtest-decisions.md). Ordinary generation supports complete
+Responses and Chat Completions responses; see [generation semantics](playtest-llm.md).
 For game scripts, construct and use models inside a `task.start` entry and step
 the session from the frame loop, following the [HTTP guide](luau-http.md).
 Tasks, connections and requests are transient host state, not ECS snapshot data.

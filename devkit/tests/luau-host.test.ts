@@ -7,7 +7,7 @@ import { runLuau } from "../src/luau/host.js";
 
 const executable = process.env.ETS_LUAU_HOST_PATH ?? resolve("../build/windows/x64/release/entisium-luau-host.exe");
 const root = resolve("tests/fixtures/playtest");
-const sdkDirectory = resolve("../runtime/playtest/luau");
+const sdkDirectory = resolve("../scripting/libraries/playtest");
 
 describe.skipIf(!existsSync(executable))("standalone Luau host", () => {
     it("sends HTTP in the native process without forwarding requests to DevKit", async () => {

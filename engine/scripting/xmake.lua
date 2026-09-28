@@ -16,8 +16,6 @@ target("entisium-scripting-core")
     add_packages("luau", "nlohmann_json", {public = true})
 
 
-includes("libraries")
-
 if not is_plat("wasm") then
     target("entisium-luau-fixture")
         set_kind("static")

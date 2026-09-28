@@ -18,7 +18,7 @@ and the DevKit Luau host regression tests.
 
 ## Context graphs
 
-[`context.luau`](../engine/scripting/libraries/context/context.luau) implements immutable observation graphs without depending on a
+[`context.luau`](../libraries/context/context.luau) implements immutable observation graphs without depending on a
 World, Playtest or a model SDK. The Playtest adapter exposes it as `@context`.
 `@context/core` is embedded in every Luau VM; it does not read library sources
 from the filesystem. Other hosts can use `bind(adapter)` to supply their own reader.
@@ -103,7 +103,7 @@ have JavaScript/double precision limits. Do not use large integers as opaque IDs
 - `encode(value)` creates JSON, including supported reflected values.
 - `copy_value(value)` makes an owned read-only copy of reflected userdata.
 
-The Playtest adapter lives in `runtime/playtest/luau/context.luau`. Node forwards
+The Playtest adapter lives in `scripting/libraries/playtest/context.luau`. Node forwards
 the batch to the existing `test.snapshot` provider. Existing observe and segment
 interfaces remain available. Model integration, history sessions and engine-side
 spatial filtering are outside this version.

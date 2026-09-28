@@ -2,11 +2,11 @@
 
 `@ai` supports stateless text and structured generation alongside Jev decisions.
 
-The shared implementation and public types live in `engine/scripting/libraries/ai/ai.luau`.
+The shared implementation and public types live in `scripting/libraries/ai/ai.luau`.
 It uses native `@http` connection handles and `@json`. Jev, Responses and Chat
 Completions protocols run in Luau; DevKit resolves configuration and credentials
 at process startup. Game and Playtest VMs load the same built-in libraries.
-See [AI and host configuration](../../docs/luau-ai.md) for the binding lifecycle.
+See [AI and host configuration](luau-ai.md) for the binding lifecycle.
 
 Generation runs in a child task which owns the HTTP request. Cancelling the task
 cancels its pending request. The response is validated with `@schema` before it
@@ -85,7 +85,7 @@ With `output`, it is strictly validated against the schema, and Luau types infer
 the output fields through `:await()`. Enum static types remain strings.
 
 The returned task supports shared waiting, cancellation, `race` and `all` through
-[`@task`](../../docs/luau-task.md). Timeout and race completion detach waits; explicit
+[`@task`](luau-task.md). Timeout and race completion detach waits; explicit
 cancellation or owner-scope exit cancels underlying work. Waiting uses
 the existing paused-simulation scheduling policy. Configuration `timeoutMs` and
 `task.timeout` use milliseconds and seconds respectively; the whole Luau run still
@@ -125,7 +125,7 @@ npm run playtest -- samples/projects/playtest_basics/project.yaml samples/projec
 npm run playtest -- samples/projects/playtest_basics/project.yaml samples/projects/playtest_basics/assets/tests/llm.luau --replay llm-run.json
 ```
 
-Records use the native HTTP tape format described in [Luau AI](../../docs/luau-ai.md).
+Records use the native HTTP tape format described in [Luau AI](luau-ai.md).
 They preserve request/response order without credentials. Replay requires matching
 model/connection aliases and protocol metadata; it does not perform provider calls.
 Old model-service tapes are not supported. Timing and wall-clock races are not

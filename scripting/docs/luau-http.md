@@ -23,7 +23,7 @@ print(response.body)
 
 ## Contract
 
-Types are defined in `engine/scripting/libraries/http/http.luau` and copied to the generated SDK.
+Types are defined in `scripting/libraries/http/http.luau` and copied to the generated SDK.
 `request(options)` returns `task.Task<http.Response>`. Cancellation propagates to
 the native request; scope cancellation discards late results. Calls outside a Task
 session fail before submitting network work.

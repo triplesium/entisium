@@ -1,7 +1,7 @@
 # Tasks and host scheduling
 
 `@task` is the shared cooperative asynchronous module. Its implementation is
-[`engine/scripting/libraries/task/task.luau`](../engine/scripting/libraries/task/task.luau); it imports no Playtest, AI, ECS or Node module. The
+[`scripting/libraries/task/task.luau`](../libraries/task/task.luau); it imports no Playtest, AI, ECS or Node module. The
 standalone host exposes the alias and generated SDK types. Game-runtime module
 loading is not yet connected to it.
 
@@ -124,7 +124,7 @@ a game or chooses whether simulation should pause. Host setup/transport failure
 also closes the root scope and attempts cleanup. Each session is bounded to 4096
 task objects; the Node host additionally limits external submissions to 2048.
 
-The Playtest adapter is `runtime/playtest/luau/scheduler.luau`. It advances one
+The Playtest adapter is `scripting/libraries/playtest/scheduler.luau`. It advances one
 shared simulation clock only when no coroutine can progress and a game wait is
 pending. Pending external requests pause simulation; other ready coroutines can
 still run. Pure wall waits do not advance the game. Idle wall/external waits use

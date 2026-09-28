@@ -39,7 +39,7 @@ export async function runPlaytest(options: PlaytestOptions): Promise<{ operation
                 ?? resolve(dirname(runtimePath), process.platform === "win32" ? "entisium-luau-host.exe" : "entisium-luau-host"),
             sourceRoot: resolve(dirname(project), config.asset_directory),
             entry: resolve(options.entry),
-            sdkDirectory: fileURLToPath(new URL("../../../runtime/playtest/luau/", import.meta.url)),
+            sdkDirectory: fileURLToPath(new URL("../../../scripting/libraries/playtest/", import.meta.url)),
             signal: options.signal, timeoutMs: options.timeoutMs, onLog: options.onLog,
             allowDuringCancellation: method => method === "game.input",
             configuration: tape ? {...configuration, tape: tape.configuration()} : configuration,

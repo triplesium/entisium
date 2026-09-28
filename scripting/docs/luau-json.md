@@ -1,7 +1,7 @@
 # Luau JSON
 
 `@json` is a built-in library shared by game and Playtest VMs. Its public API and
-Luau types live in `engine/scripting/libraries/json/json.luau`; C++ implements encoding and decoding
+Luau types are declared by `scripting/libraries/json/json.hpp` and generated into the SDK; C++ implements encoding and decoding
 with the existing nlohmann JSON dependency. It needs neither Node nor a task session.
 The generated SDK copies the same Luau source and exposes the `@json` alias.
 

@@ -155,15 +155,15 @@ TEST_CASE(
     const auto output = temporary.path() / "out";
     write(manual, "export type entity = number\n");
     const auto sources = temporary.path() / "sources";
-    const auto runtime = sources / "runtime";
+    const auto runtime = sources / "scripting";
     const auto libraries = sources / "libraries";
     for (const auto* path :
          {"libraries/task/task.luau",
           "libraries/schema/schema.luau",
           "libraries/context/context.luau",
-          "runtime/playtest/luau/game.luau",
-          "runtime/playtest/luau/scheduler.luau",
-          "runtime/playtest/luau/context.luau",
+          "scripting/libraries/playtest/game.luau",
+          "scripting/libraries/playtest/scheduler.luau",
+          "scripting/libraries/playtest/context.luau",
           "libraries/ai/ai.luau",
           "libraries/http/http.luau",
           "libraries/json/json.luau"}) {
@@ -274,9 +274,9 @@ TEST_CASE(
              {"libraries/task/task.luau", "task/init.luau"},
              {"libraries/schema/schema.luau", "schema/init.luau"},
              {"libraries/context/context.luau", "context/core.luau"},
-             {"runtime/playtest/luau/context.luau", "context/init.luau"},
-             {"runtime/playtest/luau/game.luau", "playtest/game.luau"},
-             {"runtime/playtest/luau/scheduler.luau",
+             {"scripting/libraries/playtest/context.luau", "context/init.luau"},
+             {"scripting/libraries/playtest/game.luau", "playtest/game.luau"},
+             {"scripting/libraries/playtest/scheduler.luau",
               "playtest/scheduler.luau"},
              {"libraries/ai/ai.luau", "ai/init.luau"},
              {"libraries/http/http.luau", "http/init.luau"},
@@ -341,15 +341,15 @@ TEST_CASE(
     const auto output = temporary.path() / "out";
     write(manual, "");
     const auto sources = temporary.path() / "sources";
-    const auto runtime = sources / "runtime";
+    const auto runtime = sources / "scripting";
     const auto libraries = sources / "libraries";
     for (const auto* path :
          {"libraries/task/task.luau",
           "libraries/schema/schema.luau",
           "libraries/context/context.luau",
-          "runtime/playtest/luau/game.luau",
-          "runtime/playtest/luau/scheduler.luau",
-          "runtime/playtest/luau/context.luau",
+          "scripting/libraries/playtest/game.luau",
+          "scripting/libraries/playtest/scheduler.luau",
+          "scripting/libraries/playtest/context.luau",
           "libraries/ai/ai.luau",
           "libraries/http/http.luau",
           "libraries/json/json.luau"}) {

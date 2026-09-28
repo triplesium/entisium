@@ -429,11 +429,11 @@ EmissionSummary emit_definitions(
     std::filesystem::create_directories(playtest_directory);
     write_if_changed(
         playtest_directory / "game.luau",
-        read_file(runtime_directory / "playtest/luau/game.luau")
+        read_file(runtime_directory / "libraries/playtest/game.luau")
     );
     write_if_changed(
         playtest_directory / "scheduler.luau",
-        read_file(runtime_directory / "playtest/luau/scheduler.luau")
+        read_file(runtime_directory / "libraries/playtest/scheduler.luau")
     );
     std::filesystem::remove(playtest_directory / "test.luau");
     const auto library_manifest = Json::parse(read_file(libraries_directory));
@@ -508,7 +508,7 @@ EmissionSummary emit_definitions(
     write_if_changed(output_directory / "globals.d.luau", globals.str());
     publish(
         "@context/init",
-        read_file(runtime_directory / "playtest/luau/context.luau")
+        read_file(runtime_directory / "libraries/playtest/context.luau")
     );
     const auto owned = output_directory / "library-files.json";
     if (std::filesystem::exists(owned)) {

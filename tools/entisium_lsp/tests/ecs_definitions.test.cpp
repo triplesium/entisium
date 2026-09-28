@@ -78,15 +78,15 @@ error_lines(std::string source, const std::string_view extra_definitions = {}) {
     MemoryFileResolver files;
     for (const auto& [alias, path] :
          std::vector<std::pair<std::string, std::string>> {
-             {"@schema", "engine/scripting/libraries/schema/schema.luau"},
-             {"@http", "engine/scripting/libraries/http/http.luau"},
-             {"@task", "engine/scripting/libraries/task/task.luau"},
-             {"@context/core",
-              "engine/scripting/libraries/context/context.luau"},
-             {"@context", "runtime/playtest/luau/context.luau"},
-             {"@playtest/game", "runtime/playtest/luau/game.luau"},
-             {"@playtest/scheduler", "runtime/playtest/luau/scheduler.luau"},
-             {"@ai", "engine/scripting/libraries/ai/ai.luau"},
+             {"@schema", "scripting/libraries/schema/schema.luau"},
+             {"@http", "scripting/libraries/http/http.luau"},
+             {"@task", "scripting/libraries/task/task.luau"},
+             {"@context/core", "scripting/libraries/context/context.luau"},
+             {"@context", "scripting/libraries/playtest/context.luau"},
+             {"@playtest/game", "scripting/libraries/playtest/game.luau"},
+             {"@playtest/scheduler",
+              "scripting/libraries/playtest/scheduler.luau"},
+             {"@ai", "scripting/libraries/ai/ai.luau"},
          }) {
         std::ifstream input(std::filesystem::path {ETS_PROJECT_ROOT} / path);
         REQUIRE(input);

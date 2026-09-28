@@ -1,6 +1,6 @@
 # Data schemas
 
-[`schema.luau`](../engine/scripting/libraries/schema/schema.luau) is a pure Luau module with no AI, ECS, context or host-service
+[`schema.luau`](../libraries/schema/schema.luau) is a pure Luau module with no AI, ECS, context or host-service
 dependencies. The standalone Luau host exposes it as `require("@schema")`.
 Other hosts can resolve that alias to this file; game-runtime module resolution
 does not yet automatically expose it. Generated SDK definitions include the alias

@@ -548,6 +548,7 @@ else
     includes("tests")
 end
 
+includes("scripting")
 includes("runtime")
 includes("editor")
 

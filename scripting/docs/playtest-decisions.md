@@ -1,7 +1,7 @@
 # Decision services and asynchronous tasks
 
-For ordinary text and structured LLM generation, see [LLM generation](LLM.md).
-Both use the native HTTP tape format described in [Luau AI](../../docs/luau-ai.md).
+For ordinary text and structured LLM generation, see [LLM generation](playtest-llm.md).
+Both use the native HTTP tape format described in [Luau AI](luau-ai.md).
 
 Playtest submits model decisions from Luau. DevKit resolves configuration and
 credentials; native HTTP workers send requests. The shared Luau implementation
@@ -45,7 +45,7 @@ Agent or Editor implementation. Providers of other types must explicitly configu
 TypeSafe-compatible `decisions.baseUrl`; chat completion endpoints are not
 interchangeable with this protocol.
 
-Build `entisium-runtime-host` and `entisium-luau-host` as described in README.md.
+Build `entisium-runtime-host` and `entisium-luau-host` as described in [Playtest](playtest.md).
 Set `ETS_RUNTIME_HOST_PATH` when using a release build, then run from the repo root:
 
 ```powershell
@@ -104,7 +104,7 @@ ranges fail explicitly. There are no automatic retries of paid requests.
 The shared `@ai` library implements Jev with `@http` and `@json`. DevKit resolves
 YAML aliases and injects model metadata and native-only credentials at startup.
 Game and Playtest VMs use the same bindings. Engine HTTP workers send requests
-independently of Node task dispatch. See [AI configuration](../../docs/luau-ai.md).
+independently of Node task dispatch. See [AI configuration](luau-ai.md).
 Tasks support `await()`, `status()`, `cancel()`, `task.all` and `task.race`.
 Explicit cancellation and owner-scope exit cancel pending HTTP operations.
 
@@ -119,7 +119,7 @@ Other ready Luau coroutines can continue reading snapshots or changing inputs.
 The scheduler uses bounded 25 ms host waits when idle, rather than occupying the
 protocol for the full model request. A session is limited to 2048 submissions.
 Real-time simulation during inference and image inputs are not included yet.
-Ordinary LLM generation is described in [LLM generation](LLM.md).
+Ordinary LLM generation is described in [LLM generation](playtest-llm.md).
 
 ## Validation
 
