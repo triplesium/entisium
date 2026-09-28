@@ -6,7 +6,8 @@ The browser sends authenticated requests to the Editor host. It never receives A
 
 ## Configuration
 
-Set `providers.openai.apiKey` directly in `config.yaml`. Configure the selected
+Set `providers.openai.type: openai` and `providers.openai.apiKey` in `config.yaml`.
+Every configured provider must declare its `type`. Configure the selected
 provider and model under `imageGeneration`; see [configuration.md](configuration.md)
 and [config.example.yaml](../config.example.yaml). `OPENAI_API_KEY` takes precedence
 for the `openai` image provider. ChatGPT OAuth credentials are not used by this service.

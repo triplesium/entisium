@@ -16,6 +16,7 @@ afterEach(async () => {
 const source = `version: 1
 providers:
   openai:
+    type: openai
     apiKey: test-yaml-secret
     models:
       - id: test-chat
@@ -57,6 +58,7 @@ it("writes model and key edits into the same YAML while preserving DevKit config
     const updated = await host.store.read();
     expect(updated.providers.openai.apiKey).toBe("updated-yaml-key");
     expect(updated.providers.custom.apiKey).toBe("custom-test-key");
+    expect(updated.providers.custom.type).toBe("openai-compatible");
     expect(updated.imageGeneration.model.id).toBe("test-image");
     expect(updated.agent).toMatchObject({ reasoning: "high" });
     expect(await readFile(path, "utf8")).toContain("updated-yaml-key");
@@ -74,6 +76,14 @@ it("validates Agent configuration and explicitly selected paths instead of falli
     await expect(loadHostConfiguration(path)).rejects.toThrow("selected provider");
 });
 
+it("rejects credentials for unconfigured providers without changing YAML", async () => {
+    const { host, path } = await fixture();
+    const before = await readFile(path, "utf8");
+    await expect(host.credentials.modify("missing", async () => ({ type: "api_key", key: "test-missing-key" })))
+        .rejects.toThrow("Configure the provider and its type");
+    expect(await readFile(path, "utf8")).toBe(before);
+});
+
 it("gives explicit paths priority over ETS_CONFIG_PATH", async () => {
     const { path } = await fixture();
     vi.stubEnv("ETS_CONFIG_PATH", `${path}.missing`);
@@ -82,7 +92,7 @@ it("gives explicit paths priority over ETS_CONFIG_PATH", async () => {
 });
 
 it("can delete the active model when an image-only provider comes first", async () => {
-    const reordered = source.replace('  openai:\n', '  images:\n    images: { baseUrl: https://api.openai.com/v1 }\n    apiKey: image-only-key\n  openai:\n');
+    const reordered = source.replace('  openai:\n', '  images:\n    type: openai-compatible\n    images: { baseUrl: https://api.openai.com/v1 }\n    apiKey: image-only-key\n  openai:\n');
     const { host } = await fixture(reordered);
     const registry = new HostModelRegistry(host.credentials, host.modelSettingsStore, new ModelMetadataService({ cacheDirectory: null, fetch: async () => new Response(null, { status: 503 }) }));
     await registry.configureRegistryModel({ providerId: "openai", model: {
@@ -130,6 +140,7 @@ providers:
     apiKey: shared-api-key
     images: { api: openrouter-images, baseUrl: https://images.example/v1 }
   spare:
+    type: openai-compatible
     chat: { baseUrl: https://spare.example/v1 }
     models: [{ id: spare-model, contextWindow: 8192, maxTokens: 1024 }]
 agent:
@@ -148,7 +159,7 @@ imageGeneration:
 });
 
 it("allows a provider without a catalogue or default selection to resolve a CLI model", async () => {
-    const { host } = await fixture("version: 1\nproviders:\n  custom:\n    chat: { baseUrl: https://custom.example/v1 }\n");
+    const { host } = await fixture("version: 1\nproviders:\n  custom:\n    type: openai-compatible\n    chat: { baseUrl: https://custom.example/v1 }\n");
     const registry = new HostModelRegistry(host.credentials, host.modelSettingsStore, new ModelMetadataService({ cacheDirectory: null, fetch: async () => new Response(null, { status: 503 }) }));
     expect((await registry.getModel("custom", "new-model"))?.id).toBe("new-model");
     expect((await host.store.read()).providers.custom).not.toHaveProperty("models");
@@ -208,4 +219,28 @@ it("does not publish an old in-flight lookup after the provider connection chang
     expect(await original).toMatchObject({ contextWindow: 90000, baseUrl: "https://openrouter.ai/api/v1" });
     const current = await registry.snapshot();
     expect(current.providers[0].models[0]).toMatchObject({ contextWindow: 32768, baseUrl: "https://new.example/v1" });
+});
+
+it.each(["llm", "decisions"] as const)("preserves providers referenced by %s models until reassigned", async (section) => {
+    const { host, path } = await fixture(`version: 1
+providers:
+  custom:
+    type: openai-compatible
+    chat: {baseUrl: https://custom.example/v1}
+  replacement:
+    type: openai-compatible
+    chat: {baseUrl: https://replacement.example/v1}
+${section}:
+  models:
+    planner: {provider: custom, id: example}
+`);
+    const before = await readFile(path, "utf8");
+    const settings = await host.modelSettingsStore.read();
+    const remaining = { ...settings, active: undefined, providers: settings.providers.filter(provider => provider.id !== "custom") };
+    await expect(host.modelSettingsStore.write(remaining)).rejects.toThrow(`${section}.models.planner`);
+    expect(await readFile(path, "utf8")).toBe(before);
+    await host.store.update(config => { config[section]!.models.planner.provider = "replacement"; });
+    await host.modelSettingsStore.write(remaining);
+    expect((await host.store.read()).providers).not.toHaveProperty("custom");
+    expect((await host.store.read())[section]!.models.planner.provider).toBe("replacement");
 });

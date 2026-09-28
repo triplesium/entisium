@@ -1,14 +1,10 @@
 import type { EntisiumConfig } from "./config.js";
 
 export type ProviderSettings = EntisiumConfig["providers"][string];
-export type ProviderType = NonNullable<ProviderSettings["type"]>;
-
-export function providerType(id: string, settings: ProviderSettings): ProviderType {
-    return settings.type ?? (id === "openai" || id === "openrouter" || id === "fal" ? id : "openai-compatible");
-}
+export type ProviderType = ProviderSettings["type"];
 
 export function chatConnection(id: string, settings: ProviderSettings) {
-    const type = providerType(id, settings);
+    const type = settings.type;
     if (type === "fal" && !settings.chat) return undefined;
     const baseUrl = settings.chat?.baseUrl ?? (type === "openai" ? "https://api.openai.com/v1"
         : type === "openrouter" ? "https://openrouter.ai/api/v1" : undefined);
@@ -19,7 +15,7 @@ export function chatConnection(id: string, settings: ProviderSettings) {
 }
 
 export function imageConnection(id: string, settings: ProviderSettings) {
-    const type = providerType(id, settings);
+    const type = settings.type;
     const api = settings.images?.api ?? (type === "openrouter" ? "openrouter-images" : type === "fal" ? "fal-images" : "openai-images");
     const baseUrl = settings.images?.baseUrl ?? (type === "openai" ? "https://api.openai.com/v1"
         : type === "openrouter" ? "https://openrouter.ai/api/v1" : undefined);
@@ -34,6 +30,6 @@ export function imageConnection(id: string, settings: ProviderSettings) {
 /** Built-ins may be used without a provider block (for environment/stored credentials). */
 export function selectedProvider(config: EntisiumConfig | undefined, id: string): ProviderSettings {
     if (config && Object.hasOwn(config.providers, id)) return config.providers[id];
-    if (id === "openai" || id === "openrouter" || id === "fal") return { type: id };
+    if (id === "openai" || id === "openrouter" || id === "fal" || id === "typesafe") return { type: id };
     throw new Error("The selected provider is not configured in config.yaml.");
 }

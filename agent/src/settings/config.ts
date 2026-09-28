@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { modelSelectionSchema, type EntisiumConfig } from "@entisium/devkit/settings/config";
-import { chatConnection, providerType, selectedProvider } from "@entisium/devkit/settings/providers";
+import { chatConnection, selectedProvider } from "@entisium/devkit/settings/providers";
 import type { EditorModelSettings } from "../models/model-settings-store.js";
 
 export const agentSettingsSchema = z.object({
@@ -33,7 +33,7 @@ export function modelSettingsFromConfig(config: EntisiumConfig): EditorModelSett
         const parsed = z.array(modelSchema).safeParse(provider.models ?? []);
         if (!parsed.success) throw new Error("Invalid config.yaml provider model catalogue.");
         return [{
-            id, name: provider.name ?? id, ...connection, type: providerType(id, provider),
+            id, name: provider.name ?? id, ...connection, type: provider.type,
             models: parsed.data,
         }];
     });

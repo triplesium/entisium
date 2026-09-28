@@ -8,9 +8,10 @@ const baseUrl = z.string().url().refine((value) => {
 });
 export const modelSelectionSchema = z.object({ provider: text, id: text }).strict();
 const providerSchema = z.object({
-    type: z.enum(["openai", "openrouter", "fal", "openai-compatible"]).optional(),
+    type: z.enum(["openai", "openrouter", "fal", "typesafe", "openai-compatible"]),
     name: text.optional(),
     apiKey: z.string().trim().min(8).max(4096).regex(/^[\x21-\x7e]+$/).optional(),
+    decisions: z.object({ baseUrl: baseUrl.optional() }).strict().optional(),
     chat: z.object({ api: z.enum(["responses", "chat-completions"]).optional(), baseUrl: baseUrl.optional() }).strict().optional(),
     images: z.object({
         api: z.enum(["openai-images", "openrouter-images", "fal-images"]).optional(),
@@ -29,6 +30,15 @@ export const configSchema = z.object({
         defaults: imageOptionsSchema.prefault({}),
     }).strict().prefault({}),
     runtime: z.object({ executable: text.default("auto") }).prefault({}),
+    llm: z.object({
+        models: z.record(text, modelSelectionSchema),
+        timeoutMs: z.number().int().min(1).max(300_000).default(30_000),
+        maxTokens: z.number().int().min(1).max(65536).default(4096),
+    }).strict().optional(),
+    decisions: z.object({
+        models: z.record(text, modelSelectionSchema).default({ "fast-decision": { provider: "typesafe", id: "jev-latest" } }),
+        timeoutMs: z.number().int().min(1).max(300_000).default(30_000),
+    }).strict().optional(),
     agent: z.unknown().optional(),
     editor: z.unknown().optional(),
 }).strict();

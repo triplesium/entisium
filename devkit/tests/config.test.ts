@@ -19,7 +19,7 @@ async function fixture(source: string) {
 }
 
 it("reads YAML providers with inline keys and applies DevKit defaults", async () => {
-    const store = await fixture("version: 1\nproviders:\n  openai:\n    apiKey: test-api-key\n");
+    const store = await fixture("version: 1\nproviders:\n  openai:\n    type: openai\n    apiKey: test-api-key\n");
     const config = await store.read();
     expect(config.providers.openai.apiKey).toBe("test-api-key");
     expect(config.imageGeneration).toMatchObject({ model: { provider: "openai", id: "gpt-image-2" }, defaults: {} });
@@ -49,7 +49,7 @@ it("rejects invalid syntax, duplicate keys, versions and values without echoing 
         "version: 1\nproviders: [secret-do-not-print",
         "version: 1\nversion: 1\n# secret-do-not-print",
         "version: secret-do-not-print\n",
-        "version: 1\nproviders:\n  openai:\n    apiKey: 'secret-do-not-print with space'\n",
+        "version: 1\nproviders:\n  openai:\n    type: openai\n    apiKey: 'secret-do-not-print with space'\n",
         "version: 1\nimageGeneration:\n  timeoutMs: secret-do-not-print\n",
     ]) {
         const store = await fixture(source);

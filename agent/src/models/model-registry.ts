@@ -240,18 +240,18 @@ export class HostModelRegistry {
         }
 
         if (!nextSettings.providers.some((provider) => provider.id === providerId)) throw new Error("Unknown model provider.");
-        if (input.apiKey !== undefined) {
-            const apiKey = input.apiKey.trim();
+        const apiKey = input.apiKey?.trim();
+        if (apiKey !== undefined) {
             if (!validApiKey(apiKey)) {
                 throw new Error(
                     "API key must contain between 8 and 4096 printable ASCII characters without spaces.",
                 );
             }
-            await this.credentials.modify(providerId, async () => ({ type: "api_key", key: apiKey }));
         }
         nextSettings.active = { providerId, modelId };
         await this.settingsStore.write(nextSettings);
         this.settings = nextSettings;
+        if (apiKey !== undefined) await this.credentials.modify(providerId, async () => ({ type: "api_key", key: apiKey }));
         if (input.provider || input.apiKey !== undefined) this.replaceProvider(nextSettings.providers.find((provider) => provider.id === providerId)!);
         await this.getModel(providerId, modelId);
         return this.snapshot();
@@ -271,17 +271,17 @@ export class HostModelRegistry {
         if (existingIndex >= 0) nextSettings.providers[existingIndex] = provider;
         else nextSettings.providers.push(provider);
 
-        if (input.apiKey !== undefined) {
-            const apiKey = input.apiKey.trim();
+        const apiKey = input.apiKey?.trim();
+        if (apiKey !== undefined) {
             if (!validApiKey(apiKey)) {
                 throw new Error(
                     "API key must contain between 8 and 4096 printable ASCII characters without spaces.",
                 );
             }
-            await this.credentials.modify(provider.id, async () => ({ type: "api_key", key: apiKey }));
         }
         await this.settingsStore.write(nextSettings);
         this.settings = nextSettings;
+        if (apiKey !== undefined) await this.credentials.modify(provider.id, async () => ({ type: "api_key", key: apiKey }));
         this.replaceProvider(provider);
         if (this.settings.active?.providerId === provider.id) this.registerSelectedModel(provider.id, this.settings.active.modelId);
         return this.snapshot();

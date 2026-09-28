@@ -2,7 +2,7 @@ import type { CredentialStore } from "@earendil-works/pi-ai";
 import { ImageGenerationService } from "@entisium/devkit/image-generation/service";
 import type { HostProjectService } from "@entisium/devkit/workspace/project-service";
 import type { EntisiumConfig } from "@entisium/devkit/settings/config";
-import { imageConnection, providerType, selectedProvider } from "@entisium/devkit/settings/providers";
+import { imageConnection, selectedProvider } from "@entisium/devkit/settings/providers";
 import { ModelMetadataService } from "@entisium/devkit/models/service";
 
 /** Shared Node host composition for the CLI and Editor server. */
@@ -10,7 +10,7 @@ export function createHostImageGeneration(project: HostProjectService, credentia
     const provider = config?.imageGeneration.model.provider ?? "openai";
     const settings = selectedProvider(config, provider);
     const connection = imageConnection(provider, settings);
-    const type = providerType(provider, settings);
+    const type = settings.type;
     return new ImageGenerationService(project, {
         ...connection,
         model: process.env.ETS_IMAGE_MODEL?.trim() || process.env.ENTISIUM_IMAGE_MODEL?.trim() || config?.imageGeneration.model.id || "gpt-image-2",

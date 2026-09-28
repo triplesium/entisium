@@ -23,7 +23,8 @@ export class YamlCredentialStore implements CredentialStore {
         let result: Credential | undefined;
         await this.config.update(async (config) => {
             options?.signal?.throwIfAborted();
-            const provider: ProviderSettings = Object.hasOwn(config.providers, providerId) ? config.providers[providerId] : {};
+            if (!Object.hasOwn(config.providers, providerId)) throw new Error("Configure the provider and its type before saving credentials.");
+            const provider = config.providers[providerId];
 
             result = await edit(provider.apiKey ? { type: "api_key", key: provider.apiKey } : undefined);
             options?.signal?.throwIfAborted();
@@ -53,6 +54,14 @@ export class YamlModelSettingsStore implements EditorModelSettingsStore {
                 if (retained.has(id) || !chatConnection(id, provider)) continue;
                 if (config.imageGeneration.model.provider === id || provider.images) {
                     throw new Error("This provider is shared with image generation; remove or reassign its image connection before deleting it.");
+                }
+                const references = ["llm", "decisions"] as const;
+                for (const section of references) {
+                    for (const [alias, model] of Object.entries(config[section]?.models ?? {})) {
+                        if (model.provider === id) {
+                            throw new Error(`This provider is used by ${section}.models.${alias}; reassign that model before deleting it.`);
+                        }
+                    }
                 }
                 delete config.providers[id];
             }

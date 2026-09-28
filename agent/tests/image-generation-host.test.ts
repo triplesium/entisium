@@ -39,7 +39,7 @@ it("uses saved OpenAI API keys and ignores OAuth credentials", async () => {
 it("uses the selected provider URL and credentials rather than the OpenAI environment key", async () => {
     vi.stubEnv("OPENAI_API_KEY", "unrelated-openai-key");
     const config = parseConfig({ version: 1, providers: {
-        images: { images: { baseUrl: "https://images.example.com/api/v1" }, apiKey: "image-test-key" },
+        images: { type: "openai-compatible", images: { baseUrl: "https://images.example.com/api/v1" }, apiKey: "image-test-key" },
     }, imageGeneration: { model: { provider: "images", id: "test-image" } } });
     const read = vi.fn(async () => ({ type: "api_key", key: "image-test-key" }));
     createHostImageGeneration({} as HostProjectService, { read } as unknown as CredentialStore, config);
@@ -50,7 +50,7 @@ it("uses the selected provider URL and credentials rather than the OpenAI enviro
 });
 
 it("requires a custom provider URL instead of silently using the official endpoint", () => {
-    const config = parseConfig({ version: 1, providers: { images: { apiKey: "image-test-key" } }, imageGeneration: { model: { provider: "images", id: "test-image" } } });
+    const config = parseConfig({ version: 1, providers: { images: { type: "openai-compatible", apiKey: "image-test-key" } }, imageGeneration: { model: { provider: "images", id: "test-image" } } });
     expect(() => createHostImageGeneration({} as HostProjectService, {} as CredentialStore, config)).toThrow("requires baseUrl");
 });
 
@@ -69,7 +69,7 @@ it("passes the OpenRouter image protocol independently of the conversation proto
 it("uses FAL_KEY and the official fal.ai protocol without requiring a base URL", async () => {
     vi.stubEnv("FAL_KEY", "fal-environment-key");
     vi.stubEnv("OPENAI_API_KEY", "unrelated-openai-key");
-    const config = parseConfig({ version: 1, providers: { fal: { apiKey: "saved-fal-key" } }, imageGeneration: {
+    const config = parseConfig({ version: 1, providers: { fal: { type: "fal", apiKey: "saved-fal-key" } }, imageGeneration: {
         model: { provider: "fal", id: "openai/gpt-image-2.5/sunburst/text-to-image" },
     } });
     const read = vi.fn();
