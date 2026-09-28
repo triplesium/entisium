@@ -52,6 +52,7 @@ else
     includes("pbr")
     includes("scene")
     includes("gltf")
+    includes("http")
     includes("devtools")
     includes("runtime_protocol")
     includes("runtime_inspection")

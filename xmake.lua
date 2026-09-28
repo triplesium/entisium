@@ -97,7 +97,9 @@ if is_plat("wasm") then
         }
     )
 else
-    add_requires("stb", "glad", "tinyobjloader", "mikktspace", "cpp-httplib", "nlohmann_json", "fastgltf v0.9.0")
+    add_requires("stb", "glad", "tinyobjloader", "mikktspace", "nlohmann_json", "fastgltf v0.9.0")
+    add_requires("cpp-httplib v0.53.1", {configs = {ssl = true}})
+    add_requires("libcurl 8.21.0", {configs = {shared = false, cares = true}})
     add_requires("box2d v3.1.1", {configs = {shared = false}})
     add_requires("luau 0.735", {configs = {shared = false, extern_c = false}})
     add_requires("luau-lsp 2026.8.25-entisium.5", {configs = {shared = false}})
